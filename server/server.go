@@ -98,6 +98,7 @@ func RegisterNewVictim(w http.ResponseWriter, r *http.Request) {
 		Completed: false,
 	}
 
+	log.Printf("new victim registered, ID: %s, IP: %s", victim.UUID, victim.IP)
 	db.Create(victim)
 	w.WriteHeader(http.StatusOK)
 }

