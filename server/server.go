@@ -44,12 +44,13 @@ func ServeVictimsDisplay(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetRSAPubKey(w http.ResponseWriter, r *http.Request) {
-	data, err := ioutil.ReadFile("~/go/src/github.com/nireo/gocry/public.key")
+	data, err := ioutil.ReadFile("./public.pem")
 	if err != nil {
 		http.Error(w, fmt.Sprintf("could not get rsa public key: %s", err),
 			http.StatusInternalServerError)
 	}
 
+	// w.Header().Set("Content-Type", "text/plain")
 	w.Write(data)
 }
 
