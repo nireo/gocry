@@ -44,9 +44,13 @@ func encryptSingleFile(path string, key []byte) error {
 // all of the subdirectories. It used to be a recursive function, but I think that filepath.Walk has
 // better performance.
 func EncryptRoot(startingPath string, key []byte) error {
-	if err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	if err := filepath.Walk(startingPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
+		}
+
+		if info.IsDir() {
+			return nil
 		}
 
 		if err := encryptSingleFile(path, key); err != nil {

