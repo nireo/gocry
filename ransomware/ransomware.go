@@ -3,6 +3,7 @@ package ransomware
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -108,6 +109,9 @@ func (rw *Ransomware) CheckIfValidKey() bool {
 	if err != nil {
 		return false
 	}
+
+	fmt.Println("corrent key length: ", len(rw.Key))
+	fmt.Println("key file length: ", len(rw.Key))
 
 	if bytes.Equal(key, rw.Key) {
 		return true

