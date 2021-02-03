@@ -54,6 +54,11 @@ func DecryptRoot(startingPath string, key []byte) error {
 			return err
 		}
 
+		// This for some reason causes the problem that files are not decrypted at all
+		if info.IsDir() {
+			return nil
+		}
+
 		if err := decryptSingleFile(path, key); err != nil {
 			return err
 		}

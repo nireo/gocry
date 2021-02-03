@@ -12,7 +12,9 @@ import (
 	"net/http"
 )
 
-func EncryptKey(originalKey []byte) ([]byte, error) {
+// EncryptKey fetches the RSA key from the server and uses that to encrypt the encryption key.
+func EncryptKey(originalKey []byte, uuid string) ([]byte, error) {
+	// fetch the key
 	res, err := http.Get("http://localhost:8080/pubkey")
 	if err != nil {
 		return nil, err
@@ -24,6 +26,7 @@ func EncryptKey(originalKey []byte) ([]byte, error) {
 		return nil, err
 	}
 
+	// decode the key
 	block, _ := pem.Decode(body)
 	if block == nil {
 		return nil, errors.New("bad key data: not PEM-encoded")
@@ -38,7 +41,8 @@ func EncryptKey(originalKey []byte) ([]byte, error) {
 		log.Fatalf("bad public key: %s", err)
 	}
 
-	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, originalKey, []byte("key.txt"))
+	// use the rsa key to encrypt the
+	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, originalKey, []byte("key-"+uuid))
 	if err != nil {
 		log.Fatalf("error while encrypting key content: %s", err)
 	}

