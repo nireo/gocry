@@ -28,6 +28,15 @@ go run main.go
 
 Note that the ransomware only decrypts all the files in a given path, for example: `./test`. This can be quite easily changed in the `ransomware.go` file's main function.
 
+## Todo:
+
+These are issues or ideas I think should be added.
+
+- Fix filepaths such that they work for both windows and linux.
+- Store the key on the server such that the key isn't stored in memory
+- Make a better interface compared to a simple command-line loop
+- Make the key decryption need some sort of verification
+
 ## Disclamer
 
 This project is purely for educational purposes. I'm not responsible for what you do with the code provided here.

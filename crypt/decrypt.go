@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // decryptSingleFile takes in a file path and a 32-bit encryption key and undoes the encryption.
@@ -49,6 +50,7 @@ func decryptSingleFile(path string, key []byte) error {
 // all of the subdirectories. It used to be a recursive function, but I think that filepath.Walk
 // has better performance.
 func DecryptRoot(startingPath string, key []byte) error {
+	var wg *sync.WaitGroup
 	if err := filepath.Walk(startingPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

