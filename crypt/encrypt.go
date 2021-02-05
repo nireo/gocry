@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/awnumar/memguard"
 )
 
 // encryptSingleFile takes in a file path and a 32-bit random key and uses AES-GCM-256 encryption
@@ -46,8 +48,15 @@ func encryptSingleFile(wg *sync.WaitGroup, path string, key []byte) error {
 // EncryptRoot takes in a starting path and a 32-bit random encryption key. It encrypts all files and
 // all of the subdirectories. It used to be a recursive function, but I think that filepath.Walk has
 // better performance.
-func EncryptRoot(startingPath string, key []byte) error {
+func EncryptRoot(startingPath string, key *memguard.Enclave) error {
 	var wg sync.WaitGroup
+
+	b, err := key.Open()
+	if err != nil {
+		return err
+	}
+	defer b.Destroy()
+
 	if err := filepath.Walk(startingPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -59,7 +68,7 @@ func EncryptRoot(startingPath string, key []byte) error {
 		}
 
 		wg.Add(1)
-		go encryptSingleFile(&wg, path, key)
+		go encryptSingleFile(&wg, path, b.Bytes())
 
 		return nil
 	}); err != nil {

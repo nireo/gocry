@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/awnumar/memguard"
 )
 
 // decryptSingleFile takes in a file path and a 32-bit encryption key and undoes the encryption.
 // Also removes the .gocry extension from files.
-func decryptSingleFile(path string, key []byte) error {
+func decryptSingleFile(wg *sync.WaitGroup, path string, key []byte) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return err
@@ -43,14 +45,23 @@ func decryptSingleFile(path string, key []byte) error {
 		return err
 	}
 
+	wg.Done()
+
 	return nil
 }
 
 // DecryptRoot takes in a starting path and a 32-bit encryption key. It decrypts all files and
 // all of the subdirectories. It used to be a recursive function, but I think that filepath.Walk
 // has better performance.
-func DecryptRoot(startingPath string, key []byte) error {
-	var wg *sync.WaitGroup
+func DecryptRoot(startingPath string, key *memguard.Enclave) error {
+	var wg sync.WaitGroup
+
+	b, err := key.Open()
+	if err != nil {
+		return err
+	}
+	defer b.Destroy()
+
 	if err := filepath.Walk(startingPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -61,9 +72,7 @@ func DecryptRoot(startingPath string, key []byte) error {
 			return nil
 		}
 
-		if err := decryptSingleFile(path, key); err != nil {
-			return err
-		}
+		go decryptSingleFile(&wg, path, b.Bytes())
 
 		return nil
 	}); err != nil {
