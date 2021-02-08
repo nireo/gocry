@@ -3,6 +3,7 @@ package ransomware
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -129,6 +130,9 @@ func (rw *Ransomware) CheckIfValidMemSafeKey() bool {
 		return false
 	}
 	defer b.Destroy()
+
+	fmt.Println(key)
+	fmt.Println(b.Bytes())
 
 	if bytes.Equal(key, b.Bytes()) {
 		return true

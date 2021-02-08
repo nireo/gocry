@@ -46,8 +46,8 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check that the key is of the right type.
-	if got, want := block.Type, "RSA PRIVATE KEY"; got != want {
-		http.Error(w, "unknow key type", http.StatusInternalServerError)
+	if got, want := block.Type, "PRIVATE KEY"; got != want {
+		http.Error(w, "unknown key type", http.StatusInternalServerError)
 		return
 	}
 
