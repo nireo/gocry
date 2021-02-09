@@ -1,7 +1,0 @@
-
-Hello, you've been infected by gocry. Your files have been encrypted using military grade encryption >:D.
-Do not use any decryption software or change the files, otherwise they might be lost forever.
-
-How to decrypt:
-1. Type 'decrypt' into the command-line such that 
-2. Done.
