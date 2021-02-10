@@ -12,7 +12,7 @@ import (
 )
 
 func DecryptRSA(labelUUID string, key []byte) ([]byte, error) {
-	pemd, err := ioutil.ReadFile("../private.pem")
+	pemd, err := ioutil.ReadFile("./private.pem")
 	if err != nil {
 		return nil, err
 	}

