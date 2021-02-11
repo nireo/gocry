@@ -1,5 +1,6 @@
 #include <dirent.h>
 #include <openssl/ossl_typ.h>
+#include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <sodium.h>
 #include <sodium/crypto_secretstream_xchacha20poly1305.h>
@@ -118,6 +119,10 @@ int main() {
             ++i;
         }
         closedir(root_dir);
+    }
+
+    RSA *pub_key;
+    if (PEM_read_RSAPublicKey(fopen("./public.pem", "r"), &pub_key, NULL, NULL) != 0) {
     }
 
     unsigned char encryption_key[crypto_secretstream_xchacha20poly1305_KEYBYTES];
