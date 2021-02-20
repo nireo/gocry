@@ -3,41 +3,48 @@ package crypt
 import (
 	"io/ioutil"
 	"os"
+	"sync"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/exp/errors/fmt"
 )
 
-func XChachaEncrypt(key []byte, path string) error {
+func XChachaEncrypt(wg *sync.WaitGroup, path string, key []byte) error {
 	// check valid lengths
 	if len(key) != 32 {
+		wg.Done()
 		return fmt.Errorf("wrong key length. wanted=32, got=%d", len(key))
 	}
 
 	aead, err := chacha20poly1305.NewX(key)
 	if err != nil {
+		wg.Done()
 		return err
 	}
 
 	fileData, err := ioutil.ReadFile(path)
 	if err != nil {
+		wg.Done()
 		return err
 	}
 
 	nonce := make([]byte, aead.NonceSize(), aead.NonceSize()+len(fileData)+aead.Overhead())
 
 	if err := ioutil.WriteFile(path+".gocry", aead.Seal(nonce, nonce, fileData, nil), 0666); err != nil {
+		wg.Done()
 		return err
 	}
 
 	if err := os.Remove(path); err != nil {
+		wg.Done()
 		return err
 	}
 
+	wg.Done()
 	return nil
 }
 
-func XChachaDecrypt(key []byte, path string) error {
+func XChachaDecrypt(wg *sync.WaitGroup, path string, key []byte) error {
 	if len(key) != 32 {
 		return fmt.Errorf("wrong key length. wanted=32, got=%d", len(key))
 	}

