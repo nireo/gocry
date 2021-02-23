@@ -45,10 +45,6 @@ The values of the ransomware can be configured in the `main.go` file. The ransom
 3. The key is passed into the `crypt.EncryptRoot` function which finds all the files in a given root directory, and encrypts them, using AES-GCM 256-bit encryption.
 4. Once encryption is done, the victim information is sent to the server, and establishing a unique id, with which the server can identify the client.
 
-## C client
-
-This is a very work in the process part. I'm not that familiar with C so this is just a little practice project. I included it here since wasn't really keen on making multiple ransomware repositories.
-
 ## Todo:
 
 These are issues or ideas I think should be added.
