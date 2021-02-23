@@ -19,10 +19,6 @@ const (
 // EncryptRootWithScheme takes in an optional encryption scheme and then proceeds
 // to encrypt the root directory using that scheme.
 func EncryptRootWithScheme(rootDir string, scheme EncryptionScheme, key *memguard.Enclave) error {
-	if scheme == AES256 {
-		EncryptRoot(rootDir, key)
-	}
-
 	switch scheme {
 	case AES256:
 		EncryptCommon(aesgcmEncrypt, rootDir, key)
@@ -30,6 +26,18 @@ func EncryptRootWithScheme(rootDir string, scheme EncryptionScheme, key *memguar
 		EncryptCommon(XChachaEncrypt, rootDir, key)
 	}
 
+	return nil
+}
+
+// DecryptRootWithScheme takes in a optional decryption scheme and then proceeds
+// to decrypt the root directory using that scheme.
+func DecryptRootWithScheme(rootDir string, scheme EncryptionScheme, key *memguard.Enclave) error {
+	switch scheme {
+	case AES256:
+		DecryptCommon(aesgcmEncrypt, rootDir, key)
+	case XCHACHA:
+		DecryptCommon(XChachaDecrypt, rootDir, key)
+	}
 	return nil
 }
 

