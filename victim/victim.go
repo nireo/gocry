@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 
@@ -22,12 +21,7 @@ type VictimIndentifier struct {
 
 // NewVictimIndentifer returns a pointer to a victim indentifer with a generated UUID and a timestamp.
 func NewVictimIndentifer() *VictimIndentifier {
-	uuid, err := uuid.NewV4()
-
-	// lost likely will not fail, but still handle the error
-	if err != nil {
-		log.Fatalf("fatal error generating uuid: %s", err)
-	}
+	uuid := uuid.NewV4()
 
 	return &VictimIndentifier{
 		UUID:      uuid.String(),

