@@ -62,8 +62,11 @@ func EncryptCommon(fn CryptFunc, rootDir string, key *memguard.Enclave) error {
 			return nil
 		}
 
-		wg.Add(1)
-		go fn(&wg, path, b.Bytes())
+		// check if the file should be encrypted
+		if ShouldEncrypt(path) {
+			wg.Add(1)
+			go fn(&wg, path, b.Bytes())
+		}
 		return nil
 	}); err != nil {
 		return err

