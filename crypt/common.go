@@ -3,6 +3,7 @@ package crypt
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/awnumar/memguard"
@@ -15,6 +16,82 @@ const (
 	AES256  EncryptionScheme = "aes-gcm256"
 	XCHACHA EncryptionScheme = "xchacha20poly1305"
 )
+
+// Encryptor struct holds all the functions and logic for encryption.
+type Encryptor struct {
+	encryptionScheme EncryptionScheme
+	wantedExtensions []string
+	key              *memguard.Enclave
+	rootDir          string
+	wg               *sync.WaitGroup
+}
+
+func (enc *Encryptor) NewWithScheme(dir string, scheme EncryptionScheme,
+	key *memguard.Enclave, toEncrypt []string) *Encryptor {
+
+	return &Encryptor{
+		encryptionScheme: scheme,
+		rootDir:          dir,
+		key:              key,
+		wantedExtensions: toEncrypt,
+		wg:               &sync.WaitGroup{},
+	}
+}
+
+func (enc *Encryptor) shouldEncrypt(path string) bool {
+	// just encrypt everything, not recommended
+	if len(enc.wantedExtensions) == 0 {
+		return true
+	}
+
+	for _, ext := range enc.wantedExtensions {
+		if strings.HasSuffix(path, ext) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (enc *Encryptor) encMain() {
+	switch enc.encryptionScheme {
+	case AES256:
+		enc.encryptPath(aesgcmEncrypt)
+	case XCHACHA:
+		enc.encryptPath(XChachaEncrypt)
+	}
+}
+
+func (enc *Encryptor) encryptPath(fn CryptFunc) error {
+	b, err := enc.key.Open()
+	if err != nil {
+		return err
+	}
+	defer b.Destroy()
+
+	if err := filepath.Walk(enc.rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// This for some reason causes the problem that files rae not decrypted at all
+		if info.IsDir() {
+			return nil
+		}
+
+		// check if the file should be encrypted
+		if enc.shouldEncrypt(path) {
+			enc.wg.Add(1)
+			go fn(enc.wg, path, b.Bytes())
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	enc.wg.Wait()
+	return nil
+}
 
 // EncryptRootWithScheme takes in an optional encryption scheme and then proceeds
 // to encrypt the root directory using that scheme.

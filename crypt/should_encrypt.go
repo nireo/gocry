@@ -4,6 +4,7 @@ import "strings"
 
 var toEncrypt = []string{}
 
+// ShouldEncrypt takes in a filepath and checks if it should be encrypted.
 func ShouldEncrypt(path string) bool {
 	// if the list is empty, everything should be encrypted.
 	if len(toEncrypt) == 0 {
