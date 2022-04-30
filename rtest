@@ -1,3 +1,0 @@
-rm -rf test &
-cp -r tc test &
-go run main.go

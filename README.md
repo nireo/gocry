@@ -4,9 +4,9 @@ gocry is a simple ransomware implementation using golang. It hasn't been tested 
 
 ## Disclamer
 
-This project is purely academic, use at your own risk. I do not encourage in any way the use of this software illegally or to attack targets without their previous authorization.
+This project is purely academic, use at your own risk. I do not encourage in any way the use of this software illegally or to attack targets without their permission
 
-**gocry** is an academic ransomware made for learning about cryptograpchy and security.
+**gocry** is an academic ransomware made for learning about cryptography and security.
 
 ## Running with server
 
@@ -54,9 +54,9 @@ These are issues or ideas I think should be added.
 
 ## Dependencies
 
-- [memguard](https://github.com/awnumar/memguard)
+- [memguard](https://github.com/awnumar/memguard) We want to use memguard as it tries to protect the key in memory, such that person cannot just find the key too easily.
 - [gorm](https://gorm.io/)
 
 ## Contributing
 
-The project is still in somewhat active development and anyone can open issues and create pull requests relating to the project. All contributions are appreciated!
+The development has been seized and any contributions will be accepted.
